@@ -5,7 +5,19 @@ import { SiteHeader } from "@/src/components/site-header"
 
 import data from "./data.json"
 
-async function getRooms() {
+type RoomCard = {
+  roomCode: string
+  palletTotalQty: number
+  totalPalletUsedQty: number
+  totalWeight: number
+  totalHeadPacks: number
+}
+
+function toNumber(value: unknown): number {
+  return Number(value ?? 0)
+}
+
+async function getRooms(): Promise<RoomCard[]> {
   const headerStore = await headers()
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host")
   const proto = headerStore.get("x-forwarded-proto") ?? "http"
@@ -22,8 +34,16 @@ async function getRooms() {
 
   if (!res.ok) return []
 
-  const payload = (await res.json()) as { rooms?: unknown[] }
-  return payload.rooms ?? []
+  const payload = (await res.json()) as { rooms?: Array<Record<string, unknown>> }
+  const rows = payload.rooms ?? []
+
+  return rows.map((row) => ({
+    roomCode: String(row.roomCode ?? ""),
+    palletTotalQty: toNumber(row.palletTotalQty),
+    totalPalletUsedQty: toNumber(row.totalPalletUsedQty),
+    totalWeight: toNumber(row.totalWeight),
+    totalHeadPacks: toNumber(row.totalHeadPacks),
+  }))
 }
 
 export default async function DashboardPage() {
@@ -36,7 +56,9 @@ export default async function DashboardPage() {
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <RoomSectionCards rooms={rooms} />
-            <DataTable data={data} />
+            <section className="px-4 lg:px-6">
+              <DataTable data={data} />
+            </section>
           </div>
         </div>
       </div>

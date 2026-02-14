@@ -62,10 +62,6 @@ const defaultData = {
           title: "Room Summary",
           url: "/dashboard",
         },
-        {
-          title: "Inventory Table",
-          url: "/dashboard",
-        },
       ],
     },
     {
@@ -75,7 +71,7 @@ const defaultData = {
       items: [
         {
           title: "Sales Order",
-          url: "#",
+          url: "/orders/sales-order",
         },
         {
           title: "Picklist",
@@ -117,11 +113,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         if (!res.ok) return
 
         const payload = (await res.json()) as { user?: SidebarUser }
-        if (mounted && payload.user) {
+        const nextUser = payload.user
+        if (mounted && nextUser) {
           setUser((prev) => ({
             ...prev,
-            ...payload.user,
-            avatar: payload.user.avatar || prev.avatar,
+            ...nextUser,
+            avatar: nextUser.avatar || prev.avatar,
           }))
         }
       } catch {
