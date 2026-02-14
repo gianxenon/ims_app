@@ -1,12 +1,9 @@
-import { LoginForm } from "@/src/components/login-form";
+import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 
- 
-export default function Home() {
-  return (
-    <div className="bg-muted flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
-      <main className="w-full max-w-sm md:max-w-4xl"> 
-        <LoginForm /> 
-      </main>
-    </div>
-  );
+export default async function HomePage() {
+  const cookieStore = await cookies()
+  const jwt = cookieStore.get("session")?.value
+
+  redirect(jwt ? "/dashboard" : "/login")
 }
