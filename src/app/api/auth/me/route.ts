@@ -39,10 +39,10 @@ export async function GET() {
     }
 
     const phpUrl = `${base}/udp.php?objectcode=u_ajaxtest`
-    console.log("[auth/me] sending fetchprofile", {
-      url: phpUrl,
-      token: maskToken(token),
-    })
+    // console.log("[auth/me] sending fetchprofile", {
+    //   url: phpUrl,
+    //   token: maskToken(token),
+    // })
 
     const phpRes = await fetch(phpUrl, {
       method: "POST",
@@ -55,11 +55,11 @@ export async function GET() {
     })
 
     const raw = await phpRes.text()
-    console.log("[auth/me] php response", {
-      status: phpRes.status,
-      ok: phpRes.ok,
-      preview: raw.slice(0, 200),
-    })
+    // console.log("[auth/me] php response", {
+    //   status: phpRes.status,
+    //   ok: phpRes.ok,
+    //   preview: raw.slice(0, 200),
+    // })
 
     let parsed: PhpProfileResponse | null = null
 
@@ -82,7 +82,7 @@ export async function GET() {
         userid: user.userid ?? "",
         name: user.name ?? "",
         email: user.email ?? "",
-        avatar: "/avatars/shadcn.jpg",
+        avatar: "/next.svg",
       },
     })
   } catch (err) {
@@ -90,3 +90,4 @@ export async function GET() {
     return NextResponse.json({ message: "Route crashed", error: message }, { status: 500 })
   }
 }
+

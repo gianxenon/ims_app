@@ -1,13 +1,12 @@
 import { headers } from "next/headers"
-import { DataTable } from "@/src/components/data-table"
+import { CurrentStockTable } from "@/src/components/current-stock-table"
 import { RoomSectionCards } from "@/src/components/room-section-cards"
 import { SiteHeader } from "@/src/components/site-header"
-
-import data from "./data.json"
 
 type RoomCard = {
   roomCode: string
   palletTotalQty: number
+  totalPalletCount: number
   totalPalletUsedQty: number
   totalWeight: number
   totalHeadPacks: number
@@ -40,6 +39,7 @@ async function getRooms(): Promise<RoomCard[]> {
   return rows.map((row) => ({
     roomCode: String(row.roomCode ?? ""),
     palletTotalQty: toNumber(row.palletTotalQty),
+    totalPalletCount: toNumber(row.totalPalletCount),
     totalPalletUsedQty: toNumber(row.totalPalletUsedQty),
     totalWeight: toNumber(row.totalWeight),
     totalHeadPacks: toNumber(row.totalHeadPacks),
@@ -48,6 +48,8 @@ async function getRooms(): Promise<RoomCard[]> {
 
 export default async function DashboardPage() {
   const rooms = await getRooms()
+  const company = process.env.PHP_COMPANY ?? "ics"
+  const branch = process.env.PHP_BRANCH ?? "npulcs"
 
   return (
     <>
@@ -57,7 +59,7 @@ export default async function DashboardPage() {
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <RoomSectionCards rooms={rooms} />
             <section className="px-4 lg:px-6">
-              <DataTable data={data} />
+              <CurrentStockTable company={company} branch={branch} />
             </section>
           </div>
         </div>

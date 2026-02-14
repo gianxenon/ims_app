@@ -1,10 +1,19 @@
+import { SiteHeader } from "@/src/components/site-header";
+
 export default function SalesOrderPage() {
   return (
-    <div className="p-4 lg:p-6">
-      <h1 className="text-xl font-semibold">Sales Order</h1>
-      <p className="text-muted-foreground mt-1 text-sm">
-        Sales order list and actions will be implemented here.
-      </p>
-    </div>
+  <>
+        <SiteHeader />
+        <div className="flex flex-1 flex-col">
+          <div className="@container/main flex flex-1 flex-col gap-2">
+            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+              {/* <Rom rooms={rooms} />
+              <section className="px-4 lg:px-6">
+                <CurrentStockTable company={company} branch={branch} />
+              </section> */}
+            </div>
+          </div>
+        </div>
+      </>
   )
 }

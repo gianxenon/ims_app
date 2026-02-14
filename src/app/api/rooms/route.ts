@@ -3,6 +3,10 @@ import { NextResponse } from "next/server"
 type RoomApiRow = {
   RoomCode?: string
   roomCode?: string
+  BarcodeTotalQty?: number | string
+  barcodeTotalQty?: number | string
+  TotalPalletCount?: number | string
+  totalPalletCount?: number | string
   PalletTotalQty?: number | string
   palletTotalqty?: number | string
   palletTotalQty?: number | string
@@ -69,7 +73,10 @@ export async function GET(req: Request) {
 
     const rooms = rows.map((r) => ({
       roomCode: r.RoomCode ?? r.roomCode ?? "",
-      palletTotalQty: toNumber(r.PalletTotalQty ?? r.palletTotalQty ?? r.palletTotalqty),
+      palletTotalQty: toNumber(
+        r.BarcodeTotalQty ?? r.barcodeTotalQty ?? r.PalletTotalQty ?? r.palletTotalQty ?? r.palletTotalqty
+      ),
+      totalPalletCount: toNumber(r.TotalPalletCount ?? r.totalPalletCount),
       totalPalletUsedQty: toNumber(r.TotalPalletUsedQty ?? r.totalPalletUsedQty),
       totalWeight: toNumber(r.TotalWeight ?? r.totalWeight),
       totalHeadPacks: toNumber(r.TotalHeadPacks ?? r.totalHeadPacks),

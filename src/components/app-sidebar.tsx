@@ -8,6 +8,7 @@ import {
   Settings2,
   SquareTerminal,
   ClipboardList,
+  PackageCheck,
 } from "lucide-react"
 
 import { NavMain } from "@/src/components/nav-main"
@@ -32,7 +33,7 @@ const defaultData = {
   user: {
     name: "shadcn",
     email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+    avatar: "/next.svg",
   } as SidebarUser,
   teams: [
     {
@@ -61,6 +62,25 @@ const defaultData = {
         {
           title: "Room Summary",
           url: "/dashboard",
+        },
+      ],
+    },
+    {
+      title: "Receiving",
+      url: "#",
+      icon: PackageCheck,
+      items: [
+        {
+          title: "Inbound",
+          url: "/receiving/inbound",
+        },
+        {
+          title: "Put Away",
+          url: "/receiving/put-away",
+        },
+        {
+          title: "Receiving History",
+          url: "/receiving/history",
         },
       ],
     },
@@ -147,3 +167,4 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     </Sidebar>
   )
 }
+
