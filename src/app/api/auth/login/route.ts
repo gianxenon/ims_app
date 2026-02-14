@@ -60,9 +60,8 @@ export async function POST(req: Request) {
       secure: false,
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    })
-
+      maxAge: 60 * 60 * 24 * 3,
+    }) 
     return res
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
