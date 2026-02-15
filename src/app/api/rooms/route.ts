@@ -1,22 +1,24 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { callPhp, extractPhpRows } from "@/src/lib/php-client"
 
-type RoomApiRow = {
-  RoomCode?: string
-  roomCode?: string
-  BarcodeTotalQty?: number | string
-  barcodeTotalQty?: number | string
-  TotalPalletCount?: number | string
-  totalPalletCount?: number | string
-  PalletTotalQty?: number | string
-  palletTotalqty?: number | string
-  palletTotalQty?: number | string
-  TotalPalletUsedQty?: number | string
-  totalPalletUsedQty?: number | string
-  TotalWeight?: number | string
-  totalWeight?: number | string
-  TotalHeadPacks?: number | string
-  totalHeadPacks?: number | string
-}
+const roomApiRowSchema = z.looseObject({
+    RoomCode: z.string().optional(),
+    roomCode: z.string().optional(),
+    BarcodeTotalQty: z.union([z.string(), z.number()]).optional(),
+    barcodeTotalQty: z.union([z.string(), z.number()]).optional(),
+    TotalPalletCount: z.union([z.string(), z.number()]).optional(),
+    totalPalletCount: z.union([z.string(), z.number()]).optional(),
+    PalletTotalQty: z.union([z.string(), z.number()]).optional(),
+    palletTotalqty: z.union([z.string(), z.number()]).optional(),
+    palletTotalQty: z.union([z.string(), z.number()]).optional(),
+    TotalPalletUsedQty: z.union([z.string(), z.number()]).optional(),
+    totalPalletUsedQty: z.union([z.string(), z.number()]).optional(),
+    TotalWeight: z.union([z.string(), z.number()]).optional(),
+    totalWeight: z.union([z.string(), z.number()]).optional(),
+    TotalHeadPacks: z.union([z.string(), z.number()]).optional(),
+    totalHeadPacks: z.union([z.string(), z.number()]).optional(),
+  })
 
 function toNumber(value: unknown): number {
   return Number(value ?? 0)
@@ -24,11 +26,6 @@ function toNumber(value: unknown): number {
 
 export async function GET(req: Request) {
   try {
-    const base = process.env.PHP_API_BASE
-    if (!base) {
-      return NextResponse.json({ message: "Missing PHP_API_BASE" }, { status: 500 })
-    }
-
     const url = new URL(req.url)
     const company = url.searchParams.get("company") ?? process.env.PHP_COMPANY ?? ""
     const branch = url.searchParams.get("branch") ?? process.env.PHP_BRANCH ?? ""
@@ -40,38 +37,35 @@ export async function GET(req: Request) {
       )
     }
 
-    const phpUrl = `${base}/udp.php?objectcode=u_ajaxtest`
-
-    const phpRes = await fetch(phpUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
+    const phpResult = await callPhp({
+      payload: {
         type: "fetchroomsummary",
         company,
         branch,
-      }),
-      cache: "no-store",
+      },
     })
 
-    const raw = await phpRes.text()
-    let parsed: unknown = null
-
-    try {
-      parsed = raw ? JSON.parse(raw) : []
-    } catch {
-      return NextResponse.json({ message: "PHP returned non-JSON", raw }, { status: 502 })
+    if (!phpResult.ok) {
+      return NextResponse.json(
+        { message: "Room API request failed", error: phpResult.error, raw: phpResult.raw },
+        { status: phpResult.status }
+      )
     }
 
-    const rows = Array.isArray(parsed)
-      ? (parsed as RoomApiRow[])
-      : Array.isArray((parsed as { rows?: unknown[] })?.rows)
-        ? ((parsed as { rows: RoomApiRow[] }).rows ?? [])
-        : []
+    const rawRows = extractPhpRows(phpResult.parsed)
+    const parsedRows = z.array(roomApiRowSchema).safeParse(rawRows)
 
-    const rooms = rows.map((r) => ({
+    if (!parsedRows.success) {
+      return NextResponse.json(
+        {
+          message: "Room API payload shape invalid",
+          issues: parsedRows.error.issues,
+        },
+        { status: 502 }
+      )
+    }
+
+    const rooms = parsedRows.data.map((r) => ({
       roomCode: r.RoomCode ?? r.roomCode ?? "",
       palletTotalQty: toNumber(
         r.BarcodeTotalQty ?? r.barcodeTotalQty ?? r.PalletTotalQty ?? r.palletTotalQty ?? r.palletTotalqty
@@ -81,13 +75,6 @@ export async function GET(req: Request) {
       totalWeight: toNumber(r.TotalWeight ?? r.totalWeight),
       totalHeadPacks: toNumber(r.TotalHeadPacks ?? r.totalHeadPacks),
     }))
-
-    if (!phpRes.ok) {
-      return NextResponse.json(
-        { message: "Room API request failed", raw, rooms },
-        { status: phpRes.status }
-      )
-    }
 
     return NextResponse.json({ rooms })
   } catch (err) {

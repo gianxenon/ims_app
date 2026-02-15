@@ -1,6 +1,7 @@
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { AppSidebar } from "@/src/components/app-sidebar"
+import { GlobalServerBanner } from "@/src/components/global-server-banner"
 import { SidebarInset, SidebarProvider } from "@/src/components/ui/sidebar"
 import { isSessionJwtValid } from "@/src/lib/auth/session"
 
@@ -20,7 +21,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       }
     >
       <AppSidebar variant="inset" />
-      <SidebarInset>{children}</SidebarInset>
+      <SidebarInset>
+        <GlobalServerBanner />
+        {children}
+      </SidebarInset>
     </SidebarProvider>
   )
 }

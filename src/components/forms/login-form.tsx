@@ -14,6 +14,7 @@ import {
 import { Input } from "@/src/components/ui/input"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 type LoginApiOk = { ok: true }
 type LoginApiErr = { message?: string }
@@ -69,10 +70,15 @@ export function LoginForm({
       })
 
       const text = await res.text()
-      const data: LoginApiResponse = text ? JSON.parse(text) : { message: "" }
+      let data: LoginApiResponse = { message: "" }
+      try {
+        data = text ? (JSON.parse(text) as LoginApiResponse) : { message: "" }
+      } catch {
+        data = { message: "Unexpected login response." }
+      }
 
       if (!res.ok) {
-        alert(("message" in data && data.message) || "Login failed")
+        toast.error(("message" in data && data.message) || "Login failed")
         return
       }
 

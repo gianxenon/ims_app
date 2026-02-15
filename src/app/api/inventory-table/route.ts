@@ -1,28 +1,33 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { callPhp, extractPhpRows } from "@/src/lib/php-client"
 
-type InventoryApiRow = {
-  U_RECDATE?: string
-  U_CUSTNO?: string
-  U_CUSTNAME?: string
-  U_RECEIVEDTYPE?: string
-  U_ITEMNO?: string
-  U_ITEMNAME?: string
-  U_BATCH?: string
-  U_TAGNO?: string
-  u_tagno?: string
-  U_LOCATION?: string
-  U_QUANTITY?: number | string
-  TOTALQUANTITY?: number | string
-  U_WEIGHT?: number | string
-  TOTALWEIGHT?: number | string
-  U_NUMPERHEADS?: number | string
-  U_TOTALNUMPERHEADS?: number | string
-  U_UOM?: string
-  PD?: string
-  CU?: string
-  expiry_status?: string
-  EXPIRY_STATUS?: string
-}
+const zText = z.union([z.string(), z.number(), z.null()]).optional()
+const zNumeric = z.union([z.string(), z.number(), z.null()]).optional()
+
+const inventoryApiRowSchema = z.looseObject({
+    U_RECDATE: zText,
+    U_CUSTNO: zText,
+    U_CUSTNAME: zText,
+    U_RECEIVEDTYPE: zText,
+    U_ITEMNO: zText,
+    U_ITEMNAME: zText,
+    U_BATCH: zText,
+    U_TAGNO: zText,
+    u_tagno: zText,
+    U_LOCATION: zText,
+    U_QUANTITY: zNumeric,
+    TOTALQUANTITY: zNumeric,
+    U_WEIGHT: zNumeric,
+    TOTALWEIGHT: zNumeric,
+    U_NUMPERHEADS: zNumeric,
+    U_TOTALNUMPERHEADS: zNumeric,
+    U_UOM: zText,
+    PD: zText,
+    CU: zText,
+    expiry_status: zText,
+    EXPIRY_STATUS: zText,
+  })
 
 function toNumber(value: unknown): number {
   return Number(value ?? 0)
@@ -41,11 +46,6 @@ function pickParam(url: URL, key: string): string {
 
 export async function GET(req: Request) {
   try {
-    const base = process.env.PHP_API_BASE
-    if (!base) {
-      return NextResponse.json({ message: "Missing PHP_API_BASE" }, { status: 500 })
-    }
-
     const url = new URL(req.url)
 
     const company = pickParam(url, "company") || process.env.PHP_COMPANY || ""
@@ -74,15 +74,8 @@ export async function GET(req: Request) {
       )
     }
 
-    const phpUrl = `${base}/udp.php?objectcode=u_ajaxtest`
-
-    const phpRes = await fetch(phpUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
+    const phpResult = await callPhp({
+      payload: {
         type: "fetchinventorytable",
         company,
         branch,
@@ -100,26 +93,30 @@ export async function GET(req: Request) {
         exp_to,
         rec_from,
         rec_to,
-      }),
-      cache: "no-store",
+      },
     })
 
-    const raw = await phpRes.text()
-    let parsed: unknown = null
-
-    try {
-      parsed = raw ? JSON.parse(raw) : []
-    } catch {
-      return NextResponse.json({ message: "PHP returned non-JSON", raw }, { status: 502 })
+    if (!phpResult.ok) {
+      return NextResponse.json(
+        { message: "Inventory API request failed", error: phpResult.error, raw: phpResult.raw },
+        { status: phpResult.status }
+      )
     }
 
-    const rows = Array.isArray(parsed)
-      ? (parsed as InventoryApiRow[])
-      : Array.isArray((parsed as { rows?: unknown[] })?.rows)
-        ? ((parsed as { rows: InventoryApiRow[] }).rows ?? [])
-        : []
+    const rawRows = extractPhpRows(phpResult.parsed)
+    const parsedRows = z.array(inventoryApiRowSchema).safeParse(rawRows)
 
-    const data = rows.map((row, index) => ({
+    if (!parsedRows.success) {
+      return NextResponse.json(
+        {
+          message: "Inventory API payload shape invalid",
+          issues: parsedRows.error.issues,
+        },
+        { status: 502 }
+      )
+    }
+
+    const data = parsedRows.data.map((row, index) => ({
       id: index + 1,
       recDate: String(row.U_RECDATE ?? ""),
       custNo: String(row.U_CUSTNO ?? ""),
@@ -138,13 +135,6 @@ export async function GET(req: Request) {
       ed: String(row.CU ?? ""),
       expiryStatus: normalizeStatus(row.expiry_status ?? row.EXPIRY_STATUS),
     }))
-
-    if (!phpRes.ok) {
-      return NextResponse.json(
-        { message: "Inventory API request failed", raw, data },
-        { status: phpRes.status }
-      )
-    }
 
     return NextResponse.json({ data })
   } catch (err) {

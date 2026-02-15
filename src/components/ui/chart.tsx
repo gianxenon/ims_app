@@ -127,6 +127,7 @@ function ChartTooltipContent({
     labelKey?: string
   }) {
   const { config } = useChart()
+  const numberFormatter = React.useMemo(() => new Intl.NumberFormat("en-US"), [])
 
   const tooltipLabel = React.useMemo(() => {
     if (hideLabel || !payload?.length) {
@@ -173,7 +174,7 @@ function ChartTooltipContent({
   return (
     <div
       className={cn(
-        "border-border/50 bg-background grid min-w-[8rem] items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl",
+        "border-border/50 bg-background grid min-w-32 items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl",
         className
       )}
     >
@@ -236,7 +237,7 @@ function ChartTooltipContent({
                       </div>
                       {item.value && (
                         <span className="text-foreground font-mono font-medium tabular-nums">
-                          {item.value.toLocaleString()}
+                          {numberFormatter.format(Number(item.value))}
                         </span>
                       )}
                     </div>

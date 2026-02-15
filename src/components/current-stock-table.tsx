@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { RotateCcw } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/src/components/ui/badge"
 import { Button } from "@/src/components/ui/button"
@@ -132,6 +133,8 @@ export function CurrentStockTable({
   const [loading, setLoading] = React.useState(false)
   const [pageSize, setPageSize] = React.useState(10)
   const [pageIndex, setPageIndex] = React.useState(0)
+  const numberFormatter = React.useMemo(() => new Intl.NumberFormat("en-US"), [])
+  const hadFetchErrorRef = React.useRef(false)
 
   React.useEffect(() => {
     const t = setTimeout(async () => {
@@ -143,6 +146,10 @@ export function CurrentStockTable({
 
         if (!res.ok) {
           setRows([])
+          if (!hadFetchErrorRef.current) {
+            hadFetchErrorRef.current = true
+            toast.error("Inventory fetch failed. Retrying...")
+          }
           return
         }
 
@@ -155,6 +162,16 @@ export function CurrentStockTable({
             : fromApi.filter((r) => r.expiryStatus === filters.status)
 
         setRows(filteredByStatus)
+        if (hadFetchErrorRef.current) {
+          hadFetchErrorRef.current = false
+          toast.success("Inventory connection restored.")
+        }
+      } catch {
+        setRows([])
+        if (!hadFetchErrorRef.current) {
+          hadFetchErrorRef.current = true
+          toast.error("Inventory fetch failed. Retrying...")
+        }
       } finally {
         setLoading(false)
       }
@@ -432,7 +449,7 @@ export function CurrentStockTable({
           </Button>
         </div>
 
-        <div className="max-h-[520px] overflow-y-auto rounded-lg border">
+        <div className="max-h-130 overflow-y-auto rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -455,7 +472,16 @@ export function CurrentStockTable({
               {pageRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={isDetailed ? 13 : 12} className="h-20 text-center text-sm">
-                    {loading ? "Loading inventory..." : "No inventory rows found."}
+                    {loading ? (
+                      <div className="mx-auto w-full max-w-sm">
+                        <div className="text-muted-foreground mb-2 text-xs">Loading inventory...</div>
+                        <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
+                          <div className="bg-primary h-2 w-1/2 animate-pulse rounded-full" />
+                        </div>
+                      </div>
+                    ) : (
+                      "No inventory rows found."
+                    )}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -469,9 +495,9 @@ export function CurrentStockTable({
                     {isDetailed && <TableCell>{row.barcode}</TableCell>}
                     <TableCell>{row.pd}</TableCell>
                     <TableCell>{row.ed}</TableCell>
-                    <TableCell className="text-right">{row.headsPacks.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{row.quantity.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{row.weight.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{numberFormatter.format(row.headsPacks)}</TableCell>
+                    <TableCell className="text-right">{numberFormatter.format(row.quantity)}</TableCell>
+                    <TableCell className="text-right">{numberFormatter.format(row.weight)}</TableCell>
                     <TableCell>{row.uom}</TableCell>
                     <TableCell>
                       <Badge className={statusBadgeClass(row.expiryStatus)}>{row.expiryStatus}</Badge>
@@ -484,7 +510,7 @@ export function CurrentStockTable({
         </div>
 
         <div className="text-muted-foreground text-sm">
-          Rows: {rows.length.toLocaleString()} | Totals: Heads/Packs {totalHeadsPacks.toLocaleString()} | Qty {totalQuantity.toLocaleString()} | Weight {totalWeight.toLocaleString()}
+          Rows: {numberFormatter.format(rows.length)} | Totals: Heads/Packs {numberFormatter.format(totalHeadsPacks)} | Qty {numberFormatter.format(totalQuantity)} | Weight {numberFormatter.format(totalWeight)}
         </div>
 
         <div className="flex items-center justify-between gap-3">

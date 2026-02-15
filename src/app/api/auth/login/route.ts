@@ -10,7 +10,15 @@ type PhpAuthFail = { success: false; message?: string }
 
 export async function POST(req: Request) {
   try {
-    const { userid, password } = (await req.json()) as LoginBody
+    let userid = ""
+    let password = ""
+    try {
+      const body = (await req.json()) as LoginBody
+      userid = body.userid
+      password = body.password
+    } catch {
+      return NextResponse.json({ message: "Invalid login payload." }, { status: 400 })
+    }
 
     const base = process.env.PHP_API_BASE
     if (!base) {
@@ -22,15 +30,23 @@ export async function POST(req: Request) {
 
     const phpUrl = `${base}/udp.php?objectcode=auth`
  
-    const phpRes = await fetch(phpUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
-      body: JSON.stringify({ userid, password }),
-      cache: "no-store",
-    })
+    let phpRes: Response
+    try {
+      phpRes = await fetch(phpUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({ userid, password }),
+        cache: "no-store",
+      })
+    } catch {
+      return NextResponse.json(
+        { message: "Cannot reach authentication server. Please try again." },
+        { status: 503 }
+      )
+    }
 
     const raw = await phpRes.text()
     let data: PhpAuthSuccess | PhpAuthFail | null = null
@@ -63,8 +79,10 @@ export async function POST(req: Request) {
       maxAge: 60 * 60 * 24 * 3,
     }) 
     return res
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ message: "Route crashed", error: message }, { status: 500 })
+  } catch {
+    return NextResponse.json(
+      { message: "Login failed due to a server error. Please try again." },
+      { status: 500 }
+    )
   }
 }

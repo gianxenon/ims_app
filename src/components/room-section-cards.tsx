@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/src/components/ui/card"
+import { Skeleton } from "@/src/components/ui/skeleton"
 
 type RoomCard = {
   roomCode: string
@@ -155,6 +156,38 @@ export function RoomSectionCards({
           </div>
         </div>
       )}
+    </section>
+  )
+}
+
+export function RoomSectionCardsSkeleton() {
+  return (
+    <section className="px-4 lg:px-6">
+      <div className="mb-2">
+        <h2 className="text-sm font-semibold">Rooms</h2>
+        <p className="text-muted-foreground text-xs">Live room totals and weight</p>
+      </div>
+
+      <Card className="mb-3 py-3">
+        <CardContent className="px-4">
+          <div className="mb-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-5">
+            <Skeleton className="h-14 w-full rounded-md" />
+            <Skeleton className="h-14 w-full rounded-md" />
+            <Skeleton className="h-14 w-full rounded-md" />
+            <Skeleton className="h-14 w-full rounded-md" />
+            <Skeleton className="h-14 w-full rounded-md" />
+          </div>
+          <Skeleton className="mb-2 h-3 w-40" />
+          <Skeleton className="h-2 w-full rounded-full" />
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-3 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+      </div>
     </section>
   )
 }

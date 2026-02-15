@@ -1,23 +1,48 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
+import { z } from "zod"
 import { isSessionJwtValid } from "@/src/lib/auth/session"
+import { callPhp } from "@/src/lib/php-client"
 
-type PhpProfileUser = {
-  userid?: string
-  name?: string
-  email?: string
-  token?: string
-}
+const phpProfileUserSchema = z.looseObject({
+    userid: z.string().optional(),
+    name: z.string().optional(),
+    email: z.string().optional(),
+    token: z.string().optional(),
+    USERID: z.string().optional(),
+    USERNAME: z.string().optional(),
+    GROUPID: z.string().optional(),
+    ROLEID: z.string().optional(),
+    ISVALID: z.union([z.string(), z.number()]).optional(),
+    LOCKOUT: z.union([z.string(), z.number()]).optional(),
+    EMAIL: z.string().optional(),
+    MOBILENO: z.string().optional(),
+  })
 
-type PhpProfileResponse = {
-  user?: PhpProfileUser
+const phpProfileObjectSchema = z.looseObject({
+    user: phpProfileUserSchema.optional(),
+    rows: z.array(phpProfileUserSchema).optional(),
+    error: z.string().optional(),
+  })
+
+function parsePhpProfile(parsed: unknown): {
+  user?: z.infer<typeof phpProfileUserSchema>
   error?: string
-}
+} {
+  if (Array.isArray(parsed)) {
+    const rowsResult = z.array(phpProfileUserSchema).safeParse(parsed)
+    if (!rowsResult.success) return {}
+    return { user: rowsResult.data[0] }
+  }
 
-function maskToken(token?: string): string {
-  if (!token) return ""
-  if (token.length <= 12) return "***"
-  return `${token.slice(0, 6)}...${token.slice(-6)}`
+  const objectResult = phpProfileObjectSchema.safeParse(parsed)
+  if (!objectResult.success) return {}
+
+  const rowUser = objectResult.data.rows?.[0]
+  return {
+    user: objectResult.data.user ?? rowUser,
+    error: objectResult.data.error,
+  }
 }
 
 export async function GET() {
@@ -33,55 +58,52 @@ export async function GET() {
       return res
     }
 
-    const base = process.env.PHP_API_BASE
-    if (!base) {
-      return NextResponse.json({ message: "Missing PHP_API_BASE" }, { status: 500 })
+    const callProfile = async (includeToken: boolean) =>
+      callPhp({
+        payload: includeToken ? { type: "fetchprofile", token } : { type: "fetchprofile" },
+      })
+
+    let result = await callProfile(false)
+    let profile = result.ok ? parsePhpProfile(result.parsed) : {}
+
+    if (!result.ok || !profile.user || profile.error) {
+      result = await callProfile(true)
+      profile = result.ok ? parsePhpProfile(result.parsed) : {}
     }
 
-    const phpUrl = `${base}/udp.php?objectcode=u_ajaxtest`
-    // console.log("[auth/me] sending fetchprofile", {
-    //   url: phpUrl,
-    //   token: maskToken(token),
-    // })
-
-    const phpRes = await fetch(phpUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ type: "fetchprofile", token }),
-      cache: "no-store",
-    })
-
-    const raw = await phpRes.text()
-    // console.log("[auth/me] php response", {
-    //   status: phpRes.status,
-    //   ok: phpRes.ok,
-    //   preview: raw.slice(0, 200),
-    // })
-
-    let parsed: PhpProfileResponse | null = null
-
-    try {
-      parsed = raw ? (JSON.parse(raw) as PhpProfileResponse) : null
-    } catch {
-      return NextResponse.json({ message: "PHP returned non-JSON", raw }, { status: 502 })
-    }
-
-    const user = parsed?.user
-    if (!phpRes.ok || !user || parsed?.error) {
+    if (!result.ok) {
       return NextResponse.json(
-        { message: parsed?.error ?? "Unable to load profile", php: parsed, raw },
+        { message: "Unable to load profile", error: result.error, raw: result.raw },
+        { status: result.status }
+      )
+    }
+
+    if (!profile.user || profile.error) {
+      return NextResponse.json(
+        {
+          message: profile.error ?? "Unable to load profile",
+          php: result.parsed,
+          raw: result.raw,
+        },
         { status: 401 }
       )
     }
 
+    const user = profile.user
+    const userid = user.userid ?? user.USERID ?? ""
+    const name = user.name ?? user.USERNAME ?? userid
+    const email = user.email ?? user.EMAIL ?? ""
+
     return NextResponse.json({
       user: {
-        userid: user.userid ?? "",
-        name: user.name ?? "",
-        email: user.email ?? "",
+        userid,
+        name,
+        email,
+        groupid: user.GROUPID ?? "",
+        roleid: user.ROLEID ?? "",
+        isValid: String(user.ISVALID ?? ""),
+        lockout: String(user.LOCKOUT ?? ""),
+        mobileNo: user.MOBILENO ?? "",
         avatar: "/next.svg",
       },
     })
@@ -90,4 +112,3 @@ export async function GET() {
     return NextResponse.json({ message: "Route crashed", error: message }, { status: 500 })
   }
 }
-
