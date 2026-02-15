@@ -105,7 +105,7 @@ export function RoomSectionCards({
           </CardHeader>
         </Card>
       ) : (
-        <div className="max-h-[34rem] overflow-y-auto pr-1">
+        <div className="max-h-136 overflow-y-auto pr-1">
           <div className="grid grid-cols-1 gap-3 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
             {rooms.map((room) => (
               <Card key={room.roomCode} className="gap-3 py-3">
