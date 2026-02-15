@@ -14,6 +14,14 @@ export type ItemOption = {
   itemName: string
 }
 
+export type LocationOption = {
+  code: string
+}
+
+export type PalletAddressOption = {
+  code: string
+}
+
 export type InboundHeader = {
   documentNo: string
   customerNo: string

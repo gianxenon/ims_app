@@ -28,6 +28,36 @@ type TeamItem = {
   branchCode: string
 }
 
+
+const ACTIVE_COMPANY_KEY = "active_company"
+const ACTIVE_BRANCH_KEY = "active_branch"
+
+function normalizeCode(value: string): string {
+  return value.trim().toUpperCase()
+}
+
+function readCookieValue(key: string): string {
+  const pair = document.cookie
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${key}=`))
+
+  if (!pair) return ""
+  return decodeURIComponent(pair.slice(key.length + 1))
+}
+
+function persistSelection(companyCode: string, branchCode: string) {
+  const company = companyCode.trim()
+  const branch = branchCode.trim()
+  document.cookie = `${ACTIVE_COMPANY_KEY}=${encodeURIComponent(company)}; path=/; max-age=31536000; samesite=lax`
+  document.cookie = `${ACTIVE_BRANCH_KEY}=${encodeURIComponent(branch)}; path=/; max-age=31536000; samesite=lax`
+  try {
+    window.localStorage.setItem(ACTIVE_COMPANY_KEY, company)
+    window.localStorage.setItem(ACTIVE_BRANCH_KEY, branch)
+  } catch {
+  }
+}
+
 export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
   const { isMobile } = useSidebar()
   const router = useRouter()
@@ -60,10 +90,13 @@ export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
   }, [])
 
   const applyActiveTeam = React.useCallback(
-    (team: TeamItem, refresh = false) => {
+    (team: TeamItem, opts?: { refresh?: boolean; persist?: boolean }) => {
+      const refresh = opts?.refresh ?? false
+      const persist = opts?.persist ?? false
       setActiveTeam(team)
-      document.cookie = `active_company=${encodeURIComponent(team.companyCode)}; path=/; max-age=31536000`
-      document.cookie = `active_branch=${encodeURIComponent(team.branchCode)}; path=/; max-age=31536000`
+      if (persist) {
+        persistSelection(team.companyCode, team.branchCode)
+      }
       if (refresh) {
         const switchId = ++switchCounterRef.current
         setIsSwitching(true)
@@ -85,27 +118,23 @@ export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
       return
     }
 
-    const cookieMap = document.cookie
-      .split(";")
-      .map((c) => c.trim())
-      .filter(Boolean)
-      .reduce<Record<string, string>>((acc, pair) => {
-        const idx = pair.indexOf("=")
-        if (idx === -1) return acc
-        const key = pair.slice(0, idx)
-        const value = pair.slice(idx + 1)
-        acc[key] = decodeURIComponent(value)
-        return acc
-      }, {})
-
-    const savedCompany = cookieMap.active_company ?? ""
-    const savedBranch = cookieMap.active_branch ?? ""
+    let savedCompany = ""
+    let savedBranch = ""
+    try {
+      savedCompany = window.localStorage.getItem(ACTIVE_COMPANY_KEY) ?? ""
+      savedBranch = window.localStorage.getItem(ACTIVE_BRANCH_KEY) ?? ""
+    } catch {
+    }
+    if (!savedCompany) savedCompany = readCookieValue(ACTIVE_COMPANY_KEY)
+    if (!savedBranch) savedBranch = readCookieValue(ACTIVE_BRANCH_KEY)
 
     const matched = teams.find(
-      (t) => t.companyCode === savedCompany && t.branchCode === savedBranch
+      (t) =>
+        normalizeCode(t.companyCode) === normalizeCode(savedCompany) &&
+        normalizeCode(t.branchCode) === normalizeCode(savedBranch)
     )
 
-    applyActiveTeam(matched ?? teams[0], false)
+    applyActiveTeam(matched ?? teams[0], { refresh: false, persist: false })
   }, [teams, applyActiveTeam])
 
   if (!activeTeam) {
@@ -165,7 +194,7 @@ export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
               {teams.map((team, index) => (
                 <DropdownMenuItem
                   key={`${team.companyCode}-${team.branchCode}`}
-                  onClick={() => applyActiveTeam(team, true)}
+                  onClick={() => applyActiveTeam(team, { refresh: true, persist: true })}
                   className="gap-2 p-2"
                 >
                   <div className="flex size-6 items-center justify-center rounded-md border">

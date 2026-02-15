@@ -58,6 +58,8 @@ import type {
   InboundHeader,
   InboundLine,
   ItemOption,
+  LocationOption,
+  PalletAddressOption,
   PutAwayStatus,
 } from "@/src/features/receiving/inbound/types"
 
@@ -84,7 +86,7 @@ function createLine(): InboundLine {
     location: "",
     prdDate: "",
     expDate: "",
-    quantity: "",
+    quantity: "1",
     weight: "",
   }
 }
@@ -123,9 +125,16 @@ function sumBy(lines: InboundLine[], key: "quantity" | "heads" | "weight"): numb
 
 type HeaderErrorState = Partial<Record<"customerNo" | "customerName" | "palletId" | "location", boolean>>
 type LineFieldErrorState = Partial<Record<"tagNo", boolean>>
+type LineDraftErrorState = Partial<
+  Record<
+    "itemNo" | "tagNo" | "receivingCategory" | "prdDate" | "expDate" | "heads" | "weight",
+    boolean
+  >
+>
 
 export default function InboundPage() {
   const fieldErrorClass = "border-red-500 focus-visible:ring-red-500/30"
+  const pickerPageSize = 10
   const [header, setHeader] = React.useState<InboundHeader>(initialHeader)
   const [lines, setLines] = React.useState<InboundLine[]>([])
   const [headerErrors, setHeaderErrors] = React.useState<HeaderErrorState>({})
@@ -135,11 +144,22 @@ export default function InboundPage() {
   const [editingLineId, setEditingLineId] = React.useState<string | null>(null)
   const [itemPickerOpen, setItemPickerOpen] = React.useState(false)
   const [customerPickerOpen, setCustomerPickerOpen] = React.useState(false)
+  const [locationPickerOpen, setLocationPickerOpen] = React.useState(false)
+  const [palletPickerOpen, setPalletPickerOpen] = React.useState(false)
   const [customerOptions, setCustomerOptions] = React.useState<CustomerOption[]>([])
   const [itemOptions, setItemOptions] = React.useState<ItemOption[]>([])
+  const [locationOptions, setLocationOptions] = React.useState<LocationOption[]>([])
+  const [palletOptions, setPalletOptions] = React.useState<PalletAddressOption[]>([])
   const [customerSearch, setCustomerSearch] = React.useState("")
   const [itemSearch, setItemSearch] = React.useState("")
+  const [locationSearch, setLocationSearch] = React.useState("")
+  const [palletSearch, setPalletSearch] = React.useState("")
+  const [customerPage, setCustomerPage] = React.useState(1)
+  const [itemPage, setItemPage] = React.useState(1)
+  const [locationPage, setLocationPage] = React.useState(1)
+  const [palletPage, setPalletPage] = React.useState(1)
   const [lineDraft, setLineDraft] = React.useState<InboundLine>(createLine())
+  const [lineDraftErrors, setLineDraftErrors] = React.useState<LineDraftErrorState>({})
   const [documentStatus, setDocumentStatus] = React.useState<DocumentStatus>("D")
   const [isConfirmed] = React.useState<unknown>(0)
   const [hasSavedDraft, setHasSavedDraft] = React.useState(false)
@@ -170,6 +190,36 @@ export default function InboundPage() {
       i.itemName.toLowerCase().includes(q)
     )
   }, [itemOptions, itemSearch])
+  const filteredLocations = React.useMemo(() => {
+    const q = locationSearch.trim().toLowerCase()
+    if (!q) return locationOptions
+    return locationOptions.filter((l) => l.code.toLowerCase().includes(q))
+  }, [locationOptions, locationSearch])
+  const filteredPallets = React.useMemo(() => {
+    const q = palletSearch.trim().toLowerCase()
+    if (!q) return palletOptions
+    return palletOptions.filter((p) => p.code.toLowerCase().includes(q))
+  }, [palletOptions, palletSearch])
+  const totalCustomerPages = Math.max(1, Math.ceil(filteredCustomers.length / pickerPageSize))
+  const totalItemPages = Math.max(1, Math.ceil(filteredItems.length / pickerPageSize))
+  const totalLocationPages = Math.max(1, Math.ceil(filteredLocations.length / pickerPageSize))
+  const totalPalletPages = Math.max(1, Math.ceil(filteredPallets.length / pickerPageSize))
+  const pagedCustomers = React.useMemo(() => {
+    const start = (customerPage - 1) * pickerPageSize
+    return filteredCustomers.slice(start, start + pickerPageSize)
+  }, [filteredCustomers, customerPage, pickerPageSize])
+  const pagedItems = React.useMemo(() => {
+    const start = (itemPage - 1) * pickerPageSize
+    return filteredItems.slice(start, start + pickerPageSize)
+  }, [filteredItems, itemPage, pickerPageSize])
+  const pagedLocations = React.useMemo(() => {
+    const start = (locationPage - 1) * pickerPageSize
+    return filteredLocations.slice(start, start + pickerPageSize)
+  }, [filteredLocations, locationPage, pickerPageSize])
+  const pagedPallets = React.useMemo(() => {
+    const start = (palletPage - 1) * pickerPageSize
+    return filteredPallets.slice(start, start + pickerPageSize)
+  }, [filteredPallets, palletPage, pickerPageSize])
 
   const putAwayDetails = React.useMemo(() => {
     if (putAwayStatus === "PUTAWAY") {
@@ -230,13 +280,57 @@ export default function InboundPage() {
       }
     }
 
+    const loadLocations = async () => {
+      try {
+        const res = await fetch(`/api/locations${suffix}`, { cache: "no-store" })
+        if (!res.ok) return
+        const payload = (await res.json()) as { locations?: LocationOption[] }
+        if (isMounted && Array.isArray(payload.locations) && payload.locations.length > 0) {
+          setLocationOptions(payload.locations)
+        }
+      } catch {
+        // keep local fallback
+      }
+    }
+
+    const loadPalletAddresses = async () => {
+      try {
+        const res = await fetch(`/api/pallet-addresses${suffix}`, { cache: "no-store" })
+        if (!res.ok) return
+        const payload = (await res.json()) as { pallets?: PalletAddressOption[] }
+        if (isMounted && Array.isArray(payload.pallets) && payload.pallets.length > 0) {
+          setPalletOptions(payload.pallets)
+        }
+      } catch {
+        // keep local fallback
+      }
+    }
+
     loadCustomers()
     loadItems()
+    loadLocations()
+    loadPalletAddresses()
 
     return () => {
       isMounted = false
     }
   }, [])
+
+  React.useEffect(() => {
+    setCustomerPage((prev) => Math.min(prev, totalCustomerPages))
+  }, [totalCustomerPages])
+
+  React.useEffect(() => {
+    setItemPage((prev) => Math.min(prev, totalItemPages))
+  }, [totalItemPages])
+
+  React.useEffect(() => {
+    setLocationPage((prev) => Math.min(prev, totalLocationPages))
+  }, [totalLocationPages])
+
+  React.useEffect(() => {
+    setPalletPage((prev) => Math.min(prev, totalPalletPages))
+  }, [totalPalletPages])
 
   const onDocStatusChange = (value: string) => {
     const next = value as DocumentStatus
@@ -258,13 +352,26 @@ export default function InboundPage() {
   const onOpenAddLine = () => {
     if (!editable) return
     setLineDraft(createLine())
+    setLineDraftErrors({})
     setEditingLineId(null)
     setItemSearch("")
+    setItemPage(1)
     setLineFormOpen(true)
   }
 
   const onLineDraftChange = (key: keyof InboundLine, value: string) => {
     setLineDraft((prev) => ({ ...prev, [key]: value }))
+    if (
+      key === "itemNo" ||
+      key === "tagNo" ||
+      key === "receivingCategory" ||
+      key === "prdDate" ||
+      key === "expDate" ||
+      key === "heads" ||
+      key === "weight"
+    ) {
+      setLineDraftErrors((prev) => ({ ...prev, [key]: false }))
+    }
     if (key === "tagNo" && editingLineId) {
       setLineErrors((prev) => ({
         ...prev,
@@ -280,6 +387,7 @@ export default function InboundPage() {
     setLineFormOpen(false)
     setEditingLineId(null)
     setLineDraft(createLine())
+    setLineDraftErrors({})
   }
 
   const onOpenCustomerPicker = async () => {
@@ -313,7 +421,80 @@ export default function InboundPage() {
       // keep existing list
     } finally {
       setCustomerSearch("")
+      setCustomerPage(1)
       setCustomerPickerOpen(true)
+    }
+  }
+
+  const onOpenLocationPicker = async () => {
+    if (!editable) return
+
+    const readCookie = (name: string): string => {
+      const key = `${name}=`
+      const part = document.cookie
+        .split(";")
+        .map((v) => v.trim())
+        .find((v) => v.startsWith(key))
+      return part ? decodeURIComponent(part.slice(key.length)) : ""
+    }
+
+    const company = readCookie("active_company")
+    const branch = readCookie("active_branch")
+    const qs = new URLSearchParams()
+    if (company) qs.set("company", company)
+    if (branch) qs.set("branch", branch)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ""
+
+    try {
+      const res = await fetch(`/api/locations${suffix}`, { cache: "no-store" })
+      if (res.ok) {
+        const payload = (await res.json()) as { locations?: LocationOption[] }
+        if (Array.isArray(payload.locations) && payload.locations.length > 0) {
+          setLocationOptions(payload.locations)
+        }
+      }
+    } catch {
+      // keep existing list
+    } finally {
+      setLocationSearch("")
+      setLocationPage(1)
+      setLocationPickerOpen(true)
+    }
+  }
+
+  const onOpenPalletPicker = async () => {
+    if (!editable) return
+
+    const readCookie = (name: string): string => {
+      const key = `${name}=`
+      const part = document.cookie
+        .split(";")
+        .map((v) => v.trim())
+        .find((v) => v.startsWith(key))
+      return part ? decodeURIComponent(part.slice(key.length)) : ""
+    }
+
+    const company = readCookie("active_company")
+    const branch = readCookie("active_branch")
+    const qs = new URLSearchParams()
+    if (company) qs.set("company", company)
+    if (branch) qs.set("branch", branch)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ""
+
+    try {
+      const res = await fetch(`/api/pallet-addresses${suffix}`, { cache: "no-store" })
+      if (res.ok) {
+        const payload = (await res.json()) as { pallets?: PalletAddressOption[] }
+        if (Array.isArray(payload.pallets) && payload.pallets.length > 0) {
+          setPalletOptions(payload.pallets)
+        }
+      }
+    } catch {
+      // keep existing list
+    } finally {
+      setPalletSearch("")
+      setPalletPage(1)
+      setPalletPickerOpen(true)
     }
   }
 
@@ -329,13 +510,102 @@ export default function InboundPage() {
 
   const onSelectItem = (itemNo: string, itemName: string) => {
     setLineDraft((prev) => ({ ...prev, itemNo, itemName }))
+    setLineDraftErrors((prev) => ({ ...prev, itemNo: false }))
     setItemPickerOpen(false)
+  }
+
+  const onSelectLocation = (code: string) => {
+    setHeader((prev) => ({ ...prev, location: code }))
+    setHeaderErrors((prev) => ({ ...prev, location: false }))
+    setLocationPickerOpen(false)
+    void validateHeaderLocation(code)
+  }
+
+  const onSelectPallet = (code: string) => {
+    setHeader((prev) => ({ ...prev, palletId: code }))
+    setHeaderErrors((prev) => ({ ...prev, palletId: false }))
+    setPalletPickerOpen(false)
+  }
+
+  const validateLineDraft = (): { issues: string[]; fields: LineDraftErrorState } => {
+    const issues: string[] = []
+    const fields: LineDraftErrorState = {}
+
+    const itemNo = lineDraft.itemNo.trim()
+    const tagNo = lineDraft.tagNo.trim()
+    const receivingCategory = String(lineDraft.receivingCategory ?? "").trim()
+    const prdDate = lineDraft.prdDate.trim()
+    const expDate = lineDraft.expDate.trim()
+    const heads = Number(lineDraft.heads)
+    const weight = Number(lineDraft.weight)
+
+    if (!itemNo) {
+      fields.itemNo = true
+      issues.push("Item No is required.")
+    }
+    if (!tagNo) {
+      fields.tagNo = true
+      issues.push("Tag No is required.")
+    }
+    if (!receivingCategory) {
+      fields.receivingCategory = true
+      issues.push("Receiving Category is required.")
+    }
+    if (!prdDate) {
+      fields.prdDate = true
+      issues.push("PRD date is required.")
+    }
+    if (!expDate) {
+      fields.expDate = true
+      issues.push("EXP date is required.")
+    }
+    if (prdDate && expDate && expDate < prdDate) {
+      fields.expDate = true
+      issues.push("EXP date cannot be earlier than PRD date.")
+    }
+    if (!Number.isFinite(heads) || heads <= 0) {
+      fields.heads = true
+      issues.push("Heads/Packs must be greater than 0.")
+    }
+    if (!Number.isFinite(weight) || weight <= 0) {
+      fields.weight = true
+      issues.push("Weight must be greater than 0.")
+    }
+
+    if (tagNo) {
+      const normalizedTag = tagNo.toUpperCase()
+      const duplicateTag = lines.some(
+        (line) => line.id !== editingLineId && line.tagNo.trim().toUpperCase() === normalizedTag
+      )
+      if (duplicateTag) {
+        fields.tagNo = true
+        issues.push(`Tag No already exists in this document: ${tagNo}`)
+      }
+    }
+
+    return { issues, fields }
   }
 
   const onSaveLineDraft = () => {
     if (!editable) return
+    const validation = validateLineDraft()
+    if (validation.issues.length > 0) {
+      setLineDraftErrors(validation.fields)
+      toast.error(editingLineId ? "Cannot save line item" : "Cannot add line item", {
+        description: (
+          <ul className="list-disc pl-4">
+            {validation.issues.map((err, idx) => (
+              <li key={`${err}-${idx}`}>{err}</li>
+            ))}
+          </ul>
+        ),
+      })
+      return
+    }
+
     const nextLine = {
       ...lineDraft,
+      quantity: "1",
       palletId: header.palletId.trim(),
       location: header.location.trim(),
     }
@@ -363,7 +633,8 @@ export default function InboundPage() {
     if (!editable) return
     const target = lines.find((line) => line.id === id)
     if (!target) return
-    setLineDraft({ ...target })
+    setLineDraft({ ...target, quantity: "1" })
+    setLineDraftErrors({})
     setEditingLineId(id)
     setLineFormOpen(true)
   }
@@ -451,9 +722,70 @@ export default function InboundPage() {
     })
   }
 
+  const hasHighlightedErrors = React.useMemo(() => {
+    const headerHasError = Object.values(headerErrors).some((value) => Boolean(value))
+    const linesHaveError = Object.values(lineErrors).some((lineError) =>
+      Object.values(lineError ?? {}).some((value) => Boolean(value))
+    )
+    return headerHasError || linesHaveError
+  }, [headerErrors, lineErrors])
+
+  const validateHeaderLocation = async (locationValue: string) => {
+    if (!editable) return
+    const location = locationValue.trim()
+    if (!location) return
+
+    const readCookie = (name: string): string => {
+      const key = `${name}=`
+      const part = document.cookie
+        .split(";")
+        .map((v) => v.trim())
+        .find((v) => v.startsWith(key))
+      return part ? decodeURIComponent(part.slice(key.length)) : ""
+    }
+
+    const company = readCookie("active_company")
+    const branch = readCookie("active_branch")
+    if (!company || !branch) return
+
+    try {
+      const res = await fetch("/api/location-validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          company,
+          branch,
+          location,
+        }),
+      })
+
+      const payload = (await res.json()) as {
+        valid?: boolean
+        message?: string
+      }
+
+      if (!res.ok || payload.valid === false) {
+        setHeaderErrors((prev) => ({ ...prev, location: true }))
+        toast.error(payload.message || "Location is invalid or already occupied.")
+        return
+      }
+
+      setHeaderErrors((prev) => ({ ...prev, location: false }))
+    } catch {
+      toast.error("Failed to validate location.")
+    }
+  }
+
   const onSaveDraft = async () => {
     if (documentStatus === "CN") return
     if (!editable) return
+    if (hasHighlightedErrors) {
+      toast.error(`Cannot ${hasSavedDraft ? "update" : "add"} draft`, {
+        description: "Fix highlighted fields first.",
+      })
+      return
+    }
 
     setIsSavingDraft(true)
     setHeaderErrors({})
@@ -486,19 +818,60 @@ export default function InboundPage() {
     }
 
     try {
+      const seriesName = header.receivingType === "CS_RETURN" ? "CS Return" : "CS Receive"
+      const draftDocStatus = "D"
+      const fullDraftPayload = {
+        type: hasSavedDraft ? "receivingdraftupdate" : "receivingdraftadd",
+        company,
+        branch,
+        header: {
+          docstatus: draftDocStatus,
+          documentNo: header.documentNo.trim(),
+          customerNo: header.customerNo.trim(),
+          customerName: header.customerName.trim(),
+          customerGroup: header.customerGroup.trim(),
+          receivingType: header.receivingType,
+          seriesName,
+          palletId: header.palletId.trim(),
+          location: header.location.trim(),
+          remarks: header.remarks.trim(),
+          totalQty,
+          totalHeads,
+          totalWeight,
+        },
+        lines: lines.map((line, index) => ({
+          lineNo: index + 1,
+          tagNo: line.tagNo.trim(),
+          itemNo: line.itemNo.trim(),
+          itemName: line.itemName.trim(),
+          receivingCategory: line.receivingCategory,
+          prdDate: line.prdDate || null,
+          expDate: line.expDate || null,
+          quantity: Number(line.quantity || 0),
+          heads: Number(line.heads || 0),
+          weight: Number(line.weight || 0),
+          palletId: header.palletId.trim(),
+          location: header.location.trim(),
+        })),
+      }
+      console.log("[Inbound] Draft full payload", fullDraftPayload)
+
+      const validationPayload = {
+        company,
+        branch,
+        lines: lines.map((line) => ({
+          u_batch: header.palletId.trim(),
+          u_location: header.location.trim(),
+          u_tagno: line.tagNo.trim(),
+        })),
+      }
+      console.log("[Inbound] Draft validation payload", validationPayload)
+
       const res = await fetch("/api/receiving-validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({
-          company,
-          branch,
-          lines: lines.map((line) => ({
-            u_batch: header.palletId.trim(),
-            u_location: header.location.trim(),
-            u_tagno: line.tagNo.trim(),
-          })),
-        }),
+        body: JSON.stringify(validationPayload),
       })
 
       const payload = (await res.json()) as {
@@ -704,25 +1077,53 @@ export default function InboundPage() {
                   </div>
                   <div className="space-y-1 md:justify-self-end md:w-full md:max-w-105">
                     <Label htmlFor="palletId">Pallet ID</Label>
-                    <Input
-                      id="palletId"
-                      className={headerErrors.palletId ? fieldErrorClass : undefined}
-                      value={header.palletId}
-                      onChange={(e) => onHeaderChange("palletId", e.target.value)}
-                      placeholder="PPUL000001"
-                      disabled={!editable}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="palletId"
+                        className={headerErrors.palletId ? fieldErrorClass : undefined}
+                        value={header.palletId}
+                        placeholder="Select pallet"
+                        readOnly
+                        onClick={onOpenPalletPicker}
+                        disabled={!editable}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label="Select pallet"
+                        title="Select pallet"
+                        onClick={onOpenPalletPicker}
+                        disabled={!editable}
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-1 md:justify-self-start md:w-full md:max-w-105">
                     <Label htmlFor="location">Location</Label>
-                    <Input
-                      id="location"
-                      className={headerErrors.location ? fieldErrorClass : undefined}
-                      value={header.location}
-                      onChange={(e) => onHeaderChange("location", e.target.value)}
-                      placeholder="RM1-01L-1A"
-                      disabled={!editable}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="location"
+                        className={headerErrors.location ? fieldErrorClass : undefined}
+                        value={header.location}
+                        placeholder="Select location"
+                        readOnly
+                        onClick={onOpenLocationPicker}
+                        disabled={!editable}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label="Select location"
+                        title="Select location"
+                        onClick={onOpenLocationPicker}
+                        disabled={!editable}
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-1 md:col-span-2 md:justify-self-start md:w-full md:max-w-105">
                     <Label htmlFor="remarks">Remarks</Label>
@@ -755,14 +1156,14 @@ export default function InboundPage() {
               </CardHeader>
               <CardContent>
                 <div className="h-105 overflow-auto rounded-lg border">
-                  <Table>
+                  <Table className="min-w-[1180px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-14">#</TableHead>
-                        <TableHead>Tag No</TableHead>
-                        <TableHead>Item No</TableHead>
-                        <TableHead>Item Name</TableHead>
-                        <TableHead>Receiving Category</TableHead>
+                        <TableHead className="min-w-44">Tag No</TableHead>
+                        <TableHead className="min-w-40">Item No</TableHead>
+                        <TableHead className="min-w-72">Item Name</TableHead>
+                        <TableHead className="min-w-48">Receiving Category</TableHead>
                         <TableHead>PRD</TableHead>
                         <TableHead>EXP</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
@@ -783,77 +1184,78 @@ export default function InboundPage() {
                         <TableRow key={line.id}>
                           <TableCell>{index + 1}</TableCell>
                           <TableCell>
-                            <Input
-                              className={lineErrors[line.id]?.tagNo ? fieldErrorClass : undefined}
-                              value={line.tagNo}
-                              readOnly
-                              disabled
-                            />
+                            <div
+                              className={`bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-sm whitespace-normal break-all ${
+                                lineErrors[line.id]?.tagNo ? "border-red-500" : "border-input"
+                              }`}
+                              title={line.tagNo}
+                            >
+                              {line.tagNo || "-"}
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <Input
-                              value={line.itemNo}
-                              readOnly
-                              disabled
-                            />
+                            <div
+                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-sm whitespace-normal break-all"
+                              title={line.itemNo}
+                            >
+                              {line.itemNo || "-"}
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <Input
-                              value={line.itemName}
-                              readOnly
-                              disabled
-                            />
+                            <div
+                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-sm whitespace-normal break-words"
+                              title={line.itemName}
+                            >
+                              {line.itemName || "-"}
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <Input
-                              value={line.receivingCategory}
-                              placeholder="Receiving category"
-                              readOnly
-                              disabled
-                            />
+                            <div
+                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-sm whitespace-normal break-words"
+                              title={line.receivingCategory}
+                            >
+                              {line.receivingCategory || "-"}
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <Input
-                              type="date"
-                              value={line.prdDate}
-                              readOnly
-                              disabled
-                            />
+                            <div
+                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-sm whitespace-nowrap"
+                              title={line.prdDate}
+                            >
+                              {line.prdDate || "-"}
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <Input
-                              type="date"
-                              value={line.expDate}
-                              readOnly
-                              disabled
-                            />
+                            <div
+                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-sm whitespace-nowrap"
+                              title={line.expDate}
+                            >
+                              {line.expDate || "-"}
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <Input
-                              type="number"
-                              className="text-right"
-                              value={line.quantity}
-                              readOnly
-                              disabled
-                            />
+                            <div
+                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-right text-sm whitespace-nowrap"
+                              title={line.quantity}
+                            >
+                              {line.quantity || "0"}
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <Input
-                              type="number"
-                              className="text-right"
-                              value={line.heads}
-                              readOnly
-                              disabled
-                            />
+                            <div
+                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-right text-sm whitespace-nowrap"
+                              title={line.heads}
+                            >
+                              {line.heads || "0"}
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <Input
-                              type="number"
-                              className="text-right"
-                              value={line.weight}
-                              readOnly
-                              disabled
-                            />
+                            <div
+                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-right text-sm whitespace-nowrap"
+                              title={line.weight}
+                            >
+                              {line.weight || "0"}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center justify-end gap-1">
@@ -926,6 +1328,7 @@ export default function InboundPage() {
                 if (!open) {
                   setEditingLineId(null)
                   setLineDraft(createLine())
+                  setLineDraftErrors({})
                 }
               }}
             >
@@ -945,14 +1348,23 @@ export default function InboundPage() {
                     <div className="space-y-1 md:col-span-2">
                       <Label>Item No</Label>
                       <div className="flex gap-2">
-                        <Input value={lineDraft.itemNo} readOnly placeholder="Select item" />
+                        <Input
+                          className={lineDraftErrors.itemNo ? fieldErrorClass : undefined}
+                          value={lineDraft.itemNo}
+                          readOnly
+                          placeholder="Select item"
+                        />
                         <Button
                           variant="outline"
                           size="icon-sm"
                           type="button"
                           aria-label="Select item"
                           title="Select item"
-                          onClick={() => setItemPickerOpen(true)}
+                          onClick={() => {
+                            setItemSearch("")
+                            setItemPage(1)
+                            setItemPickerOpen(true)
+                          }}
                         >
                           <MoreHorizontal className="size-4" />
                         </Button>
@@ -967,6 +1379,7 @@ export default function InboundPage() {
                     <div className="space-y-1">
                       <Label>Tag No</Label>
                       <Input
+                        className={lineDraftErrors.tagNo ? fieldErrorClass : undefined}
                         value={lineDraft.tagNo}
                         onChange={(e) => onLineDraftChange("tagNo", e.target.value)}
                       />
@@ -977,7 +1390,7 @@ export default function InboundPage() {
                         value={lineDraft.receivingCategory}
                         onValueChange={(value) => onLineDraftChange("receivingCategory", value)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className={lineDraftErrors.receivingCategory ? fieldErrorClass : undefined}>
                           <SelectValue placeholder="Select receiving category" />
                         </SelectTrigger>
                         <SelectContent>
@@ -992,6 +1405,7 @@ export default function InboundPage() {
                     <div className="space-y-1">
                       <Label>PRD</Label>
                       <Input
+                        className={lineDraftErrors.prdDate ? fieldErrorClass : undefined}
                         type="date"
                         value={lineDraft.prdDate}
                         onChange={(e) => onLineDraftChange("prdDate", e.target.value)}
@@ -1000,6 +1414,7 @@ export default function InboundPage() {
                     <div className="space-y-1">
                       <Label>EXP</Label>
                       <Input
+                        className={lineDraftErrors.expDate ? fieldErrorClass : undefined}
                         type="date"
                         value={lineDraft.expDate}
                         onChange={(e) => onLineDraftChange("expDate", e.target.value)}
@@ -1007,15 +1422,12 @@ export default function InboundPage() {
                     </div>
                     <div className="space-y-1">
                       <Label>Qty</Label>
-                      <Input
-                        type="number"
-                        value={lineDraft.quantity}
-                        onChange={(e) => onLineDraftChange("quantity", e.target.value)}
-                      />
+                      <Input type="number" value="1" readOnly disabled />
                     </div>
                     <div className="space-y-1">
                       <Label>Heads/Packs</Label>
                       <Input
+                        className={lineDraftErrors.heads ? fieldErrorClass : undefined}
                         type="number"
                         value={lineDraft.heads}
                         onChange={(e) => onLineDraftChange("heads", e.target.value)}
@@ -1024,6 +1436,7 @@ export default function InboundPage() {
                     <div className="space-y-1 md:col-span-2">
                       <Label>Weight</Label>
                       <Input
+                        className={lineDraftErrors.weight ? fieldErrorClass : undefined}
                         type="number"
                         value={lineDraft.weight}
                         onChange={(e) => onLineDraftChange("weight", e.target.value)}
@@ -1052,7 +1465,10 @@ export default function InboundPage() {
                         <div className="px-3 py-2">
                           <Input
                             value={itemSearch}
-                            onChange={(e) => setItemSearch(e.target.value)}
+                            onChange={(e) => {
+                              setItemSearch(e.target.value)
+                              setItemPage(1)
+                            }}
                             placeholder="Search item no or item name"
                           />
                         </div>
@@ -1063,7 +1479,7 @@ export default function InboundPage() {
                         {filteredItems.length === 0 ? (
                           <div className="px-3 py-4 text-sm text-muted-foreground">No items found.</div>
                         ) : (
-                          filteredItems.map((item) => (
+                          pagedItems.map((item) => (
                             <button
                               key={item.itemNo}
                               type="button"
@@ -1074,6 +1490,31 @@ export default function InboundPage() {
                               <span>{item.itemName}</span>
                             </button>
                           ))
+                        )}
+                        {filteredItems.length > 0 && (
+                          <div className="mt-2 flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
+                            <span>Page {itemPage} of {totalItemPages}</span>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setItemPage((prev) => Math.max(1, prev - 1))}
+                                disabled={itemPage === 1}
+                              >
+                                Prev
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setItemPage((prev) => Math.min(totalItemPages, prev + 1))}
+                                disabled={itemPage === totalItemPages}
+                              >
+                                Next
+                              </Button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1095,7 +1536,10 @@ export default function InboundPage() {
                     <div className="px-3 py-2">
                       <Input
                         value={customerSearch}
-                        onChange={(e) => setCustomerSearch(e.target.value)}
+                        onChange={(e) => {
+                          setCustomerSearch(e.target.value)
+                          setCustomerPage(1)
+                        }}
                         placeholder="Search customer no, name, or group"
                       />
                     </div>
@@ -1107,7 +1551,7 @@ export default function InboundPage() {
                     {filteredCustomers.length === 0 ? (
                       <div className="px-3 py-4 text-sm text-muted-foreground">No customers found.</div>
                     ) : (
-                      filteredCustomers.map((customer) => (
+                      pagedCustomers.map((customer) => (
                         <button
                           key={customer.customerNo}
                           type="button"
@@ -1125,6 +1569,165 @@ export default function InboundPage() {
                           <span>{customer.groupName}</span>
                         </button>
                       ))
+                    )}
+                    {filteredCustomers.length > 0 && (
+                      <div className="mt-2 flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
+                        <span>Page {customerPage} of {totalCustomerPages}</span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCustomerPage((prev) => Math.max(1, prev - 1))}
+                            disabled={customerPage === 1}
+                          >
+                            Prev
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCustomerPage((prev) => Math.min(totalCustomerPages, prev + 1))}
+                            disabled={customerPage === totalCustomerPages}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {locationPickerOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div className="bg-background w-full max-w-2xl overflow-hidden rounded-lg border shadow-lg">
+                  <div className="flex items-center justify-between border-b px-4 py-3">
+                    <h3 className="text-base font-semibold">Select Location</h3>
+                    <Button variant="outline" size="sm" onClick={() => setLocationPickerOpen(false)}>
+                      Close
+                    </Button>
+                  </div>
+                  <div className="max-h-[60vh] overflow-y-auto p-2">
+                    <div className="px-3 py-2">
+                      <Input
+                        value={locationSearch}
+                        onChange={(e) => {
+                          setLocationSearch(e.target.value)
+                          setLocationPage(1)
+                        }}
+                        placeholder="Search location code"
+                      />
+                    </div>
+                    <div className="grid grid-cols-[1fr] gap-2 border-b px-3 py-2 text-xs font-semibold uppercase tracking-wide">
+                      <div>Location</div>
+                    </div>
+                    {filteredLocations.length === 0 ? (
+                      <div className="px-3 py-4 text-sm text-muted-foreground">No locations found.</div>
+                    ) : (
+                      pagedLocations.map((location) => (
+                        <button
+                          key={location.code}
+                          type="button"
+                          className="hover:bg-accent grid w-full grid-cols-[1fr] gap-2 rounded-md px-3 py-2 text-left text-sm"
+                          onClick={() => onSelectLocation(location.code)}
+                        >
+                          <span>{location.code}</span>
+                        </button>
+                      ))
+                    )}
+                    {filteredLocations.length > 0 && (
+                      <div className="mt-2 flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
+                        <span>Page {locationPage} of {totalLocationPages}</span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setLocationPage((prev) => Math.max(1, prev - 1))}
+                            disabled={locationPage === 1}
+                          >
+                            Prev
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setLocationPage((prev) => Math.min(totalLocationPages, prev + 1))}
+                            disabled={locationPage === totalLocationPages}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {palletPickerOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div className="bg-background w-full max-w-2xl overflow-hidden rounded-lg border shadow-lg">
+                  <div className="flex items-center justify-between border-b px-4 py-3">
+                    <h3 className="text-base font-semibold">Select Pallet</h3>
+                    <Button variant="outline" size="sm" onClick={() => setPalletPickerOpen(false)}>
+                      Close
+                    </Button>
+                  </div>
+                  <div className="max-h-[60vh] overflow-y-auto p-2">
+                    <div className="px-3 py-2">
+                      <Input
+                        value={palletSearch}
+                        onChange={(e) => {
+                          setPalletSearch(e.target.value)
+                          setPalletPage(1)
+                        }}
+                        placeholder="Search pallet code"
+                      />
+                    </div>
+                    <div className="grid grid-cols-[1fr] gap-2 border-b px-3 py-2 text-xs font-semibold uppercase tracking-wide">
+                      <div>Pallet</div>
+                    </div>
+                    {filteredPallets.length === 0 ? (
+                      <div className="px-3 py-4 text-sm text-muted-foreground">No pallet addresses found.</div>
+                    ) : (
+                      pagedPallets.map((pallet) => (
+                        <button
+                          key={pallet.code}
+                          type="button"
+                          className="hover:bg-accent grid w-full grid-cols-[1fr] gap-2 rounded-md px-3 py-2 text-left text-sm"
+                          onClick={() => onSelectPallet(pallet.code)}
+                        >
+                          <span>{pallet.code}</span>
+                        </button>
+                      ))
+                    )}
+                    {filteredPallets.length > 0 && (
+                      <div className="mt-2 flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
+                        <span>Page {palletPage} of {totalPalletPages}</span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPalletPage((prev) => Math.max(1, prev - 1))}
+                            disabled={palletPage === 1}
+                          >
+                            Prev
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPalletPage((prev) => Math.min(totalPalletPages, prev + 1))}
+                            disabled={palletPage === totalPalletPages}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
