@@ -3,6 +3,7 @@
 import * as React from "react"
 import { ChevronsUpDown, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { persistActiveSelection, readActiveSelection } from "@/src/lib/active-branch"
 
 import {
   DropdownMenu,
@@ -28,34 +29,8 @@ type TeamItem = {
   branchCode: string
 }
 
-
-const ACTIVE_COMPANY_KEY = "active_company"
-const ACTIVE_BRANCH_KEY = "active_branch"
-
 function normalizeCode(value: string): string {
   return value.trim().toUpperCase()
-}
-
-function readCookieValue(key: string): string {
-  const pair = document.cookie
-    .split(";")
-    .map((c) => c.trim())
-    .find((c) => c.startsWith(`${key}=`))
-
-  if (!pair) return ""
-  return decodeURIComponent(pair.slice(key.length + 1))
-}
-
-function persistSelection(companyCode: string, branchCode: string) {
-  const company = companyCode.trim()
-  const branch = branchCode.trim()
-  document.cookie = `${ACTIVE_COMPANY_KEY}=${encodeURIComponent(company)}; path=/; max-age=31536000; samesite=lax`
-  document.cookie = `${ACTIVE_BRANCH_KEY}=${encodeURIComponent(branch)}; path=/; max-age=31536000; samesite=lax`
-  try {
-    window.localStorage.setItem(ACTIVE_COMPANY_KEY, company)
-    window.localStorage.setItem(ACTIVE_BRANCH_KEY, branch)
-  } catch {
-  }
 }
 
 export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
@@ -95,7 +70,7 @@ export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
       const persist = opts?.persist ?? false
       setActiveTeam(team)
       if (persist) {
-        persistSelection(team.companyCode, team.branchCode)
+        persistActiveSelection(team.companyCode, team.branchCode)
       }
       if (refresh) {
         const switchId = ++switchCounterRef.current
@@ -118,15 +93,9 @@ export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
       return
     }
 
-    let savedCompany = ""
-    let savedBranch = ""
-    try {
-      savedCompany = window.localStorage.getItem(ACTIVE_COMPANY_KEY) ?? ""
-      savedBranch = window.localStorage.getItem(ACTIVE_BRANCH_KEY) ?? ""
-    } catch {
-    }
-    if (!savedCompany) savedCompany = readCookieValue(ACTIVE_COMPANY_KEY)
-    if (!savedBranch) savedBranch = readCookieValue(ACTIVE_BRANCH_KEY)
+    const saved = readActiveSelection()
+    const savedCompany = saved?.companyCode ?? ""
+    const savedBranch = saved?.branchCode ?? ""
 
     const matched = teams.find(
       (t) =>
@@ -134,10 +103,10 @@ export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
         normalizeCode(t.branchCode) === normalizeCode(savedBranch)
     )
 
-    applyActiveTeam(matched ?? teams[0], { refresh: false, persist: false })
+    applyActiveTeam(matched, { refresh: false, persist: false })
   }, [teams, applyActiveTeam])
 
-  if (!activeTeam) {
+  if (!activeTeam && teams.length === 0) {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
@@ -151,6 +120,10 @@ export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
       </SidebarMenu>
     )
   }
+
+  const selectedTeam = activeTeam ?? teams[0]
+
+  if (!selectedTeam) return null
 
   return (
     <>
@@ -173,11 +146,11 @@ export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
                 <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <activeTeam.logo className="size-4" />
+                  <selectedTeam.logo className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{activeTeam.name}</span>
-                  <span className="truncate text-xs">{activeTeam.plan}</span>
+                  <span className="truncate font-medium">{activeTeam ? activeTeam.name : "Select branch"}</span>
+                  <span className="truncate text-xs">{activeTeam ? activeTeam.plan : "Required before using routes"}</span>
                 </div>
                 <ChevronsUpDown className="ml-auto" />
               </SidebarMenuButton>

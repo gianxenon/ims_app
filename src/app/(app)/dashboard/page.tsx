@@ -5,8 +5,8 @@ import { SiteHeader } from "@/src/components/site-header"
 
 export default async function DashboardPage() {
   const cookieStore = await cookies()
-  const company = cookieStore.get("active_company")?.value ?? process.env.PHP_COMPANY ?? "ics"
-  const branch = cookieStore.get("active_branch")?.value ?? process.env.PHP_BRANCH ?? "npulcs"
+  const company = cookieStore.get("active_company")?.value ?? process.env.PHP_COMPANY ?? ""
+  const branch = cookieStore.get("active_branch")?.value ?? process.env.PHP_BRANCH ?? ""
 
   return (
     <>

@@ -57,8 +57,8 @@ async function getRooms(company: string, branch: string): Promise<RoomRow[]> {
 
 export default async function PalletUtilizationEmailPreviewPage() {
   const cookieStore = await cookies()
-  const company = cookieStore.get("active_company")?.value ?? process.env.PHP_COMPANY ?? "ics"
-  const branch = cookieStore.get("active_branch")?.value ?? process.env.PHP_BRANCH ?? "npulcs"
+  const company = cookieStore.get("active_company")?.value ?? process.env.PHP_COMPANY ?? ""
+  const branch = cookieStore.get("active_branch")?.value ?? process.env.PHP_BRANCH ?? ""
   const rooms = await getRooms(company, branch)
 
   const totalPallets = rooms.reduce((sum, row) => sum + row.totalPalletCount, 0)

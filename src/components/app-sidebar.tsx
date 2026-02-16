@@ -99,20 +99,12 @@ const defaultData = {
   ],
 }
 
-const fallbackTeam: SidebarTeam = {
-  name: "Default Branch",
-  logo: GalleryVerticalEnd,
-  plan: "Fallback",
-  companyCode: process.env.NEXT_PUBLIC_FALLBACK_COMPANY ?? "ics",
-  branchCode: process.env.NEXT_PUBLIC_FALLBACK_BRANCH ?? "npulcs",
-}
-
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [user, setUser] = React.useState<SidebarUser>(defaultData.user)
   const [teams, setTeams] = React.useState<SidebarTeam[]>(defaultData.teams)
   const [meLoading, setMeLoading] = React.useState(true)
   const [branchesLoading, setBranchesLoading] = React.useState(true)
-  const teamsToRender = teams.length > 0 ? teams : [fallbackTeam]
+  const teamsToRender = teams.length > 0 ? teams : []
   
 
   // Load user info on mount
@@ -209,7 +201,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={defaultData.navMain} />
+        <NavMain items={defaultData.navMain} teams={teamsToRender} />
       </SidebarContent>
       <SidebarFooter>
         {meLoading ? (
