@@ -1,8 +1,8 @@
 "use client"
 
-import * as React from "react"
 import { RotateCcw } from "lucide-react"
-import { toast } from "sonner"
+import { useCurrentStock } from "@/src/features/dashboard/current-stock/use-current-stock"
+import type { CurrentStockRow, Filters } from "@/src/features/dashboard/current-stock/types"
 
 import { Badge } from "@/src/components/ui/badge"
 import { Button } from "@/src/components/ui/button"
@@ -25,96 +25,10 @@ import {
 } from "@/src/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs"
 
-export type CurrentStockRow = {
-  id: number
-  recDate: string
-  custNo: string
-  custName: string
-  receivedType: string
-  itemNo: string
-  itemName: string
-  batch: string
-  barcode: string
-  location: string
-  headsPacks: number
-  quantity: number
-  weight: number
-  uom: string
-  pd: string
-  ed: string
-  expiryStatus: "GOOD" | "NEAR EXPIRY" | "EXPIRED"
-}
-
-type Filters = {
-  showdetails: "0" | "1"
-  withpendings: "0" | "1"
-  itemno: string
-  batch: string
-  location: string
-  status: "all" | "GOOD" | "NEAR EXPIRY" | "EXPIRED"
-  tagno: string
-  receivedtype: string
-  custno: string
-  prd_from: string
-  prd_to: string
-  exp_from: string
-  exp_to: string
-  rec_from: string
-  rec_to: string
-}
-
-const defaultFilters: Filters = {
-  showdetails: "0",
-  withpendings: "0",
-  itemno: "",
-  batch: "",
-  location: "",
-  status: "all",
-  tagno: "",
-  receivedtype: "",
-  custno: "",
-  prd_from: "",
-  prd_to: "",
-  exp_from: "",
-  exp_to: "",
-  rec_from: "",
-  rec_to: "",
-}
-
 function statusBadgeClass(status: CurrentStockRow["expiryStatus"]): string {
   if (status === "GOOD") return "bg-emerald-600 text-white border-transparent"
   if (status === "NEAR EXPIRY") return "bg-amber-500 text-white border-transparent"
   return "bg-rose-600 text-white border-transparent"
-}
-
-function buildUrl(basePath: string, company: string, branch: string, f: Filters): string {
-  const p = new URLSearchParams({
-    company,
-    branch,
-    showdetails: f.showdetails,
-    withpendings: f.withpendings,
-    itemno: f.itemno,
-    batch: f.batch,
-    location: f.location,
-    tagno: f.tagno,
-    receivedtype: f.receivedtype,
-    custno: f.custno,
-    prd_from: f.prd_from,
-    prd_to: f.prd_to,
-    exp_from: f.exp_from,
-    exp_to: f.exp_to,
-    rec_from: f.rec_from,
-    rec_to: f.rec_to,
-  })
-  return `${basePath}?${p.toString()}`
-}
-
-function csvEscape(value: unknown): string {
-  const s = String(value ?? "")
-  if (s.includes("\"") || s.includes(",") || s.includes("\n")) {
-    return `"${s.replace(/"/g, "\"\"")}"`
-  }
-  return s
 }
 
 export function CurrentStockTable({
@@ -126,119 +40,29 @@ export function CurrentStockTable({
   branch: string
   initialData?: CurrentStockRow[]
 }) {
-  const [filters, setFilters] = React.useState<Filters>(defaultFilters)
-  const [showMainFilters, setShowMainFilters] = React.useState(true)
-  const [showAdvanced, setShowAdvanced] = React.useState(false)
-  const [rows, setRows] = React.useState<CurrentStockRow[]>(initialData)
-  const [loading, setLoading] = React.useState(false)
-  const [pageSize, setPageSize] = React.useState(10)
-  const [pageIndex, setPageIndex] = React.useState(0)
-  const numberFormatter = React.useMemo(() => new Intl.NumberFormat("en-US"), [])
-  const hadFetchErrorRef = React.useRef(false)
-
-  React.useEffect(() => {
-    const t = setTimeout(async () => {
-      setLoading(true)
-      try {
-        const res = await fetch(buildUrl("/api/inventory-table", company, branch, filters), {
-          cache: "no-store",
-        })
-
-        if (!res.ok) {
-          setRows([])
-          if (!hadFetchErrorRef.current) {
-            hadFetchErrorRef.current = true
-            toast.error("Inventory fetch failed. Retrying...")
-          }
-          return
-        }
-
-        const payload = (await res.json()) as { data?: CurrentStockRow[] }
-        const fromApi = payload.data ?? []
-
-        const filteredByStatus =
-          filters.status === "all"
-            ? fromApi
-            : fromApi.filter((r) => r.expiryStatus === filters.status)
-
-        setRows(filteredByStatus)
-        if (hadFetchErrorRef.current) {
-          hadFetchErrorRef.current = false
-          toast.success("Inventory connection restored.")
-        }
-      } catch {
-        setRows([])
-        if (!hadFetchErrorRef.current) {
-          hadFetchErrorRef.current = true
-          toast.error("Inventory fetch failed. Retrying...")
-        }
-      } finally {
-        setLoading(false)
-      }
-    }, 250)
-
-    return () => clearTimeout(t)
-  }, [company, branch, filters])
-
-  React.useEffect(() => {
-    setPageIndex(0)
-  }, [rows, pageSize])
-
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
-  const safePageIndex = Math.min(pageIndex, totalPages - 1)
-  const pageStart = safePageIndex * pageSize
-  const pageRows = rows.slice(pageStart, pageStart + pageSize)
-  const isDetailed = filters.showdetails === "1"
-  const totalHeadsPacks = rows.reduce((sum, row) => sum + row.headsPacks, 0)
-  const totalQuantity = rows.reduce((sum, row) => sum + row.quantity, 0)
-  const totalWeight = rows.reduce((sum, row) => sum + row.weight, 0)
-
-  const handleDownloadCsv = React.useCallback(() => {
-    const headers = [
-      "Rec Date",
-      "Location",
-      "Item No",
-      "Item Name",
-      "Batch",
-      ...(isDetailed ? ["Barcode"] : []),
-      "PD",
-      "ED",
-      "Heads/Packs",
-      "Qty",
-      "Weight",
-      "UOM",
-      "Status",
-    ]
-
-    const body = rows.map((row) => [
-      row.recDate,
-      row.location,
-      row.itemNo,
-      row.itemName,
-      row.batch,
-      ...(isDetailed ? [row.barcode] : []),
-      row.pd,
-      row.ed,
-      row.headsPacks,
-      row.quantity,
-      row.weight,
-      row.uom,
-      row.expiryStatus,
-    ])
-
-    const csv = [
-      headers.map(csvEscape).join(","),
-      ...body.map((line) => line.map(csvEscape).join(",")),
-    ].join("\n")
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `current-stock-${company}-${branch}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [rows, isDetailed, company, branch])
+  const {
+    filters,
+    setFilters,
+    resetFilters,
+    showMainFilters,
+    setShowMainFilters,
+    showAdvanced,
+    setShowAdvanced,
+    rows,
+    loading,
+    pageSize,
+    setPageSize,
+    setPageIndex,
+    numberFormatter,
+    totalPages,
+    safePageIndex,
+    pageRows,
+    isDetailed,
+    totalHeadsPacks,
+    totalQuantity,
+    totalWeight,
+    handleDownloadCsv,
+  } = useCurrentStock(company, branch, initialData)
 
   return (
     <Tabs defaultValue="current-stock" className="w-full flex-col gap-4">
@@ -444,7 +268,7 @@ export function CurrentStockTable({
           <Button variant="outline" size="sm" onClick={handleDownloadCsv} disabled={rows.length === 0}>
             Download CSV
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setFilters(defaultFilters)} aria-label="Reset filters" title="Reset filters">
+          <Button variant="ghost" size="icon" onClick={resetFilters} aria-label="Reset filters" title="Reset filters">
             <RotateCcw className="h-4 w-4" />
           </Button>
         </div>

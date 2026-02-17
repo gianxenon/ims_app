@@ -27,8 +27,8 @@ function toNumber(value: unknown): number {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
-    const company = url.searchParams.get("company") ?? process.env.PHP_COMPANY ?? ""
-    const branch = url.searchParams.get("branch") ?? process.env.PHP_BRANCH ?? ""
+    const company = url.searchParams.get("company")  ?? ""
+    const branch = url.searchParams.get("branch") ?? ""
 
     if (!company || !branch) {
       return NextResponse.json(

@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Invalid login payload." }, { status: 400 })
     }
 
+    //check base url in env
     const base = process.env.PHP_API_BASE
     if (!base) {
       return NextResponse.json(
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
         { status: 500 }
       )
     }
-
+    // call base + /udp.php?objectcode=auth with POST method and body { userid, password }
     const phpUrl = `${base}/udp.php?objectcode=auth`
  
     let phpRes: Response
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
     const res = NextResponse.json({ ok: true })
     res.cookies.set("session", jwt, {
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 3,

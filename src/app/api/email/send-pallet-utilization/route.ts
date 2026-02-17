@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { callPhp, extractPhpRows } from "@/src/lib/php-client"
 
+export const runtime = "nodejs"
+
 const requestSchema = z.object({
   company: z.string().trim().min(1).optional(),
   branch: z.string().trim().min(1).optional(),
@@ -51,6 +53,35 @@ function statusColor(rate: number): string {
   if (rate < 50) return "#047857"
   if (rate < 75) return "#b45309"
   return "#be123c"
+}
+
+function summarizeUnknown(value: unknown): string {
+  if (value == null) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  if (value instanceof Error) return value.message || value.name
+
+  if (typeof value === "object") {
+    const objectValue = value as { message?: unknown; error?: unknown; detail?: unknown }
+
+    if (typeof objectValue.message === "string" && objectValue.message) {
+      return objectValue.message
+    }
+    if (typeof objectValue.error === "string" && objectValue.error) {
+      return objectValue.error
+    }
+    if (typeof objectValue.detail === "string" && objectValue.detail) {
+      return objectValue.detail
+    }
+
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return "[unserializable detail]"
+    }
+  }
+
+  return String(value)
 }
 
 function buildEmailHtml(company: string, branch: string, rooms: RoomRow[]): string {
@@ -174,7 +205,7 @@ async function sendViaResend({
   }
 
   if (!resendRes.ok) {
-    return { ok: false, detail: parsed }
+    return { ok: false, detail: summarizeUnknown(parsed) || `Resend HTTP ${resendRes.status}` }
   }
 
   return { ok: true, id: (parsed as { id?: string } | null)?.id }
@@ -240,8 +271,7 @@ async function sendViaSmtp({
 
     return { ok: true, id: info.messageId }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return { ok: false, detail: message }
+    return { ok: false, detail: summarizeUnknown(err) }
   }
 }
 
@@ -319,7 +349,7 @@ export async function POST(req: Request) {
 
       if (!smtpResult.ok) {
         return NextResponse.json(
-          { message: "SMTP send failed", detail: smtpResult.detail },
+          { message: "SMTP send failed", detail: summarizeUnknown(smtpResult.detail) },
           { status: 502 }
         )
       }
@@ -347,14 +377,14 @@ export async function POST(req: Request) {
 
     if (!resendResult.ok) {
       return NextResponse.json(
-        { message: "Resend request failed", detail: resendResult.detail },
+        { message: "Resend request failed", detail: summarizeUnknown(resendResult.detail) },
         { status: 502 }
       )
     }
 
     return NextResponse.json({ ok: true, message: "Sample email sent via Resend.", id: resendResult.id })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = summarizeUnknown(err)
     return NextResponse.json({ message: "Failed to send sample email", error: message }, { status: 500 })
   }
 }

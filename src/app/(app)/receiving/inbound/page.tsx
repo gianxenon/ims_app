@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
@@ -6,62 +6,15 @@ import { toast } from "sonner"
 
 import { SiteHeader } from "@/src/components/site-header"
 import { Button } from "@/src/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/src/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/src/components/ui/dropdown-menu"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/src/components/ui/card"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/src/components/ui/dropdown-menu"
 import { Input } from "@/src/components/ui/input"
 import { Label } from "@/src/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/src/components/ui/select"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/src/components/ui/sheet"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/src/components/ui/table"
-import {
-  DOCUMENT_STATUS_LABELS,
-  DOCUMENT_STATUS_VALUES,
-  RECEIVING_CATEGORY_VALUES,
-  RECEIVING_TYPE_LABELS,
-  RECEIVING_TYPE_VALUES,
-  type DocumentStatus,
-} from "@/src/lib/transaction-enums"
-import type {
-  CustomerOption,
-  InboundHeader,
-  InboundLine,
-  ItemOption,
-  LocationOption,
-  PalletAddressOption,
-  PutAwayStatus,
-} from "@/src/features/receiving/inbound/types"
+import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue,} from "@/src/components/ui/select"
+import {Sheet,SheetContent,SheetDescription,SheetHeader,SheetTitle,} from "@/src/components/ui/sheet"
+import {Table,TableBody,TableCell,TableHead,TableHeader,TableRow,} from "@/src/components/ui/table"
+import {DOCUMENT_STATUS_LABELS,DOCUMENT_STATUS_VALUES,RECEIVING_CATEGORY_VALUES,RECEIVING_TYPE_LABELS,RECEIVING_TYPE_VALUES, type DocumentStatus,} from "@/src/lib/transaction-enums"
+import type {CustomerOption,InboundHeader,InboundLine,ItemOption,LocationOption,PalletAddressOption,PutAwayStatus,} from "@/src/features/receiving/inbound/types"
 
 const initialHeader: InboundHeader = {
   documentNo: "",
@@ -76,7 +29,7 @@ const initialHeader: InboundHeader = {
 
 function createLine(): InboundLine {
   return {
-    id: crypto.randomUUID(),
+    id: "",
     tagNo: "",
     itemNo: "",
     itemName: "",
@@ -124,6 +77,7 @@ function sumBy(lines: InboundLine[], key: "quantity" | "heads" | "weight"): numb
 }
 
 type HeaderErrorState = Partial<Record<"customerNo" | "customerName" | "palletId" | "location", boolean>>
+
 type LineFieldErrorState = Partial<Record<"tagNo", boolean>>
 type LineDraftErrorState = Partial<
   Record<
@@ -131,6 +85,38 @@ type LineDraftErrorState = Partial<
     boolean
   >
 >
+type InboundDocumentRecord = {
+  documentNo: string
+  status: DocumentStatus
+  isConfirmed: unknown
+  confirmedBy: string
+  confirmedDateTime: string
+  hasSavedDraft: boolean
+  updatedAt: string
+  systemReceivingDate: string
+  documentReceivingDate: string
+  lineCount: number
+  header: InboundHeader
+  lines: InboundLine[]
+  totalQty: number
+  totalHeads: number
+  totalWeight: number
+}
+
+function normalizeDocumentStatus(value: string): DocumentStatus {
+  const status = value.trim().toUpperCase()
+  if (status === "D" || status === "O" || status === "C" || status === "CN") return status
+  if (status === "CANCELLED" || status === "CANCELED") return "CN"
+  if (status === "CLOSE" || status === "CLOSED") return "C"
+  if (status === "OPEN") return "O"
+  return "D"
+}
+
+function normalizeReceivingType(value: string): InboundHeader["receivingType"] {
+  const type = value.trim().toUpperCase()
+  if (type === "CS_RETURN" || type.includes("RETURN")) return "CS_RETURN"
+  return "CS_RECEIVING"
+}
 
 export default function InboundPage() {
   const fieldErrorClass = "border-red-500 focus-visible:ring-red-500/30"
@@ -161,8 +147,16 @@ export default function InboundPage() {
   const [lineDraft, setLineDraft] = React.useState<InboundLine>(createLine())
   const [lineDraftErrors, setLineDraftErrors] = React.useState<LineDraftErrorState>({})
   const [documentStatus, setDocumentStatus] = React.useState<DocumentStatus>("D")
-  const [isConfirmed] = React.useState<unknown>(0)
+  const [isConfirmed, setIsConfirmed] = React.useState<unknown>(0)
+  const [confirmedBy, setConfirmedBy] = React.useState("")
+  const [confirmedDateTime, setConfirmedDateTime] = React.useState("")
   const [hasSavedDraft, setHasSavedDraft] = React.useState(false)
+  const [documentSheetOpen, setDocumentSheetOpen] = React.useState(false)
+  const [selectedDocumentNo, setSelectedDocumentNo] = React.useState<string | null>(null)
+  const [documents, setDocuments] = React.useState<InboundDocumentRecord[]>([])
+  const [documentPage, setDocumentPage] = React.useState(1)
+  const [documentPageSize, setDocumentPageSize] = React.useState(10)
+  const [isLoadingDocuments, setIsLoadingDocuments] = React.useState(false)
 
   const putAwayStatus = React.useMemo(
     () => mapIsConfirmedToPutAwayStatus(isConfirmed),
@@ -173,6 +167,20 @@ export default function InboundPage() {
   const totalQty = React.useMemo(() => sumBy(lines, "quantity"), [lines])
   const totalHeads = React.useMemo(() => sumBy(lines, "heads"), [lines])
   const totalWeight = React.useMemo(() => sumBy(lines, "weight"), [lines])
+  const totalDocuments = documents.length
+  const totalDocumentPages = Math.max(1, Math.ceil(totalDocuments / documentPageSize))
+  const draftDocumentCount = React.useMemo(
+    () => documents.filter((doc) => doc.status === "D").length,
+    [documents]
+  )
+  const confirmedDocumentCount = React.useMemo(
+    () => documents.filter((doc) => doc.status === "C").length,
+    [documents]
+  )
+  const cancelledDocumentCount = React.useMemo(
+    () => documents.filter((doc) => doc.status === "CN").length,
+    [documents]
+  )
   const filteredCustomers = React.useMemo(() => {
     const q = customerSearch.trim().toLowerCase()
     if (!q) return customerOptions
@@ -220,12 +228,16 @@ export default function InboundPage() {
     const start = (palletPage - 1) * pickerPageSize
     return filteredPallets.slice(start, start + pickerPageSize)
   }, [filteredPallets, palletPage, pickerPageSize])
+  const pagedDocuments = React.useMemo(() => {
+    const start = (documentPage - 1) * documentPageSize
+    return documents.slice(start, start + documentPageSize)
+  }, [documents, documentPage, documentPageSize])
 
   const putAwayDetails = React.useMemo(() => {
     if (putAwayStatus === "PUTAWAY") {
       return {
-        confirmedBy: "System User",
-        confirmedDate: new Date().toLocaleString(),
+        confirmedBy: confirmedBy || "System User",
+        confirmedDate: confirmedDateTime || "Confirmed",
       }
     }
 
@@ -233,7 +245,286 @@ export default function InboundPage() {
       confirmedBy: "Not yet confirmed",
       confirmedDate: "Not yet confirmed",
     }
-  }, [putAwayStatus])
+  }, [putAwayStatus, confirmedBy, confirmedDateTime])
+
+  const readCookie = React.useCallback((name: string): string => {
+    const key = `${name}=`
+    const part = document.cookie
+      .split(";")
+      .map((v) => v.trim())
+      .find((v) => v.startsWith(key))
+    return part ? decodeURIComponent(part.slice(key.length)) : ""
+  }, [])
+
+  const getCompanyBranch = React.useCallback(() => {
+    const company = readCookie("active_company")
+    const branch = readCookie("active_branch")
+    return { company, branch }
+  }, [readCookie])
+
+  const loadReceivingDocuments = React.useCallback(async () => {
+    const { company, branch } = getCompanyBranch()
+
+    setIsLoadingDocuments(true)
+    try {
+      const qs = new URLSearchParams()
+      if (company) qs.set("company", company)
+      if (branch) qs.set("branch", branch)
+      const suffix = qs.toString() ? `?${qs.toString()}` : ""
+      const res = await fetch(`/api/receiving${suffix}`, { cache: "no-store" })
+      if (!res.ok) {
+        const failed = (await res.json()) as { message?: string; error?: string }
+        toast.error(failed.message || "Failed to load inbound documents.")
+        return
+      }
+
+      const payload = (await res.json()) as {
+        documents?: Array<{
+          documentNo?: string
+          status?: string
+          isConfirmed?: unknown
+          confirmedBy?: string
+          confirmedDateTime?: string
+          receivingType?: string
+          customerNo?: string
+          customerName?: string
+          customerGroup?: string
+          palletId?: string
+          location?: string
+          remarks?: string
+          systemReceivingDate?: string
+          documentReceivingDate?: string
+          totalQty?: number
+          totalHeads?: number
+          totalWeight?: number
+        }>
+      }
+
+      if (!Array.isArray(payload.documents)) return
+
+      const mapped = payload.documents
+        .filter((doc) => String(doc.documentNo ?? "").trim().length > 0)
+        .map((doc) => {
+          const totalQtyValue = Number(doc.totalQty ?? 0)
+          const totalHeadsValue = Number(doc.totalHeads ?? 0)
+          const totalWeightValue = Number(doc.totalWeight ?? 0)
+          const receivingType = normalizeReceivingType(String(doc.receivingType ?? ""))
+          const status = normalizeDocumentStatus(String(doc.status ?? ""))
+          const confirmedBy = String(doc.confirmedBy ?? "").trim()
+          const confirmedDateTime = String(doc.confirmedDateTime ?? "").trim()
+          const updatedAt =
+            String(doc.systemReceivingDate ?? "").trim() ||
+            String(doc.documentReceivingDate ?? "").trim() ||
+            ""
+
+          return {
+            documentNo: String(doc.documentNo ?? "").trim(),
+            status,
+            isConfirmed: doc.isConfirmed ?? 0,
+            confirmedBy,
+            confirmedDateTime,
+            hasSavedDraft: status === "D",
+            updatedAt,
+            systemReceivingDate: String(doc.systemReceivingDate ?? "").trim(),
+            documentReceivingDate: String(doc.documentReceivingDate ?? "").trim(),
+            lineCount: Number.isFinite(totalQtyValue) ? totalQtyValue : 0,
+            header: {
+              documentNo: String(doc.documentNo ?? "").trim(),
+              customerNo: String(doc.customerNo ?? ""),
+              customerName: String(doc.customerName ?? ""),
+              customerGroup: String(doc.customerGroup ?? ""),
+              palletId: String(doc.palletId ?? ""),
+              location: String(doc.location ?? ""),
+              receivingType,
+              remarks: String(doc.remarks ?? ""),
+            },
+            lines: [],
+            totalQty: Number.isFinite(totalQtyValue) ? totalQtyValue : 0,
+            totalHeads: Number.isFinite(totalHeadsValue) ? totalHeadsValue : 0,
+            totalWeight: Number.isFinite(totalWeightValue) ? totalWeightValue : 0,
+          } satisfies InboundDocumentRecord
+        })
+
+      setDocuments(mapped)
+      setDocumentPage(1)
+    } catch {
+      toast.error("Failed to load inbound documents.")
+    } finally {
+      setIsLoadingDocuments(false)
+    }
+  }, [getCompanyBranch])
+
+  const createDocumentNo = React.useCallback(() => {
+    const year = new Date().getFullYear()
+    const used = new Set(documents.map((doc) => doc.documentNo))
+    let sequence = documents.length + 1
+    let candidate = `INB-${year}-${String(sequence).padStart(6, "0")}`
+    while (used.has(candidate)) {
+      sequence += 1
+      candidate = `INB-${year}-${String(sequence).padStart(6, "0")}`
+    }
+    return candidate
+  }, [documents])
+
+  const upsertDocumentFromCurrentState = (
+    documentNo: string,
+    nextStatus: DocumentStatus,
+    nextHasSavedDraft: boolean
+  ) => {
+    const now = new Date().toISOString().slice(0, 19).replace("T", " ")
+    const record: InboundDocumentRecord = {
+      documentNo,
+      status: nextStatus,
+      isConfirmed,
+      confirmedBy,
+      confirmedDateTime,
+      hasSavedDraft: nextHasSavedDraft,
+      updatedAt: now,
+      systemReceivingDate: now,
+      documentReceivingDate: now.slice(0, 10),
+      lineCount: lines.length,
+      header: { ...header, documentNo },
+      lines: lines.map((line) => ({ ...line })),
+      totalQty,
+      totalHeads,
+      totalWeight,
+    }
+
+    setDocuments((prev) => {
+      const index = prev.findIndex((doc) => doc.documentNo === documentNo)
+      if (index < 0) return [record, ...prev]
+      const next = [...prev]
+      next[index] = record
+      return next
+    })
+    setDocumentPage(1)
+  }
+
+  const resetDocumentEditor = (documentNo = "") => {
+    setHeader({ ...initialHeader, documentNo })
+    setLines([])
+    setDocumentStatus("D")
+    setIsConfirmed(0)
+    setConfirmedBy("")
+    setConfirmedDateTime("")
+    setHasSavedDraft(false)
+    setHeaderErrors({})
+    setLineErrors({})
+    setLineFormOpen(false)
+    setEditingLineId(null)
+    setLineDraft(createLine())
+    setLineDraftErrors({})
+  }
+
+  const onCreateDocument = () => {
+    const nextDocumentNo = createDocumentNo()
+    resetDocumentEditor(nextDocumentNo)
+    setSelectedDocumentNo(nextDocumentNo)
+    setDocumentPage(1)
+    setDocumentSheetOpen(true)
+  }
+
+  const onOpenDocument = async (documentNo: string) => {
+    const target = documents.find((doc) => doc.documentNo === documentNo)
+    if (!target) return
+    setHeader({ ...target.header })
+    setLines(target.lines.map((line) => ({ ...line })))
+    setDocumentStatus(target.status)
+    setIsConfirmed(target.isConfirmed)
+    setConfirmedBy(target.confirmedBy)
+    setConfirmedDateTime(target.confirmedDateTime)
+    setHasSavedDraft(target.hasSavedDraft)
+    setHeaderErrors({})
+    setLineErrors({})
+    setLineFormOpen(false)
+    setEditingLineId(null)
+    setLineDraft(createLine())
+    setLineDraftErrors({})
+    setSelectedDocumentNo(target.documentNo)
+    setDocumentSheetOpen(true)
+
+    const { company, branch } = getCompanyBranch()
+
+    try {
+      const qs = new URLSearchParams({ documentNo })
+      if (company) qs.set("company", company)
+      if (branch) qs.set("branch", branch)
+      const res = await fetch(`/api/receiving?${qs.toString()}`, { cache: "no-store" })
+      if (!res.ok) {
+        const failed = (await res.json()) as { message?: string; error?: string }
+        toast.error(failed.message || "Failed to load document lines.")
+        return
+      }
+
+      const payload = (await res.json()) as {
+        status?: string
+        isConfirmed?: unknown
+        confirmedBy?: string
+        confirmedDateTime?: string
+        lines?: Array<{
+          lineNo?: string
+          tagNo?: string
+          itemNo?: string
+          itemName?: string
+          receivingCategory?: string
+          prdDate?: string
+          expDate?: string
+          quantity?: string
+          heads?: string
+          weight?: string
+          palletId?: string
+          location?: string
+        }>
+      }
+
+      if (!Array.isArray(payload.lines)) return
+
+      const fetchedLines: InboundLine[] = payload.lines.map((line, index) => ({
+        id: `${documentNo}-${line.lineNo ?? index + 1}-${line.tagNo ?? line.itemNo ?? index + 1}`,
+        tagNo: String(line.tagNo ?? ""),
+        itemNo: String(line.itemNo ?? ""),
+        itemName: String(line.itemName ?? ""),
+        receivingCategory: String(line.receivingCategory ?? "").toUpperCase() as InboundLine["receivingCategory"],
+        heads: String(line.heads ?? "0"),
+        palletId: String(line.palletId ?? target.header.palletId ?? ""),
+        location: String(line.location ?? target.header.location ?? ""),
+        prdDate: String(line.prdDate ?? ""),
+        expDate: String(line.expDate ?? ""),
+        quantity: String(line.quantity ?? "0"),
+        weight: String(line.weight ?? "0"),
+      }))
+      const nextStatus = normalizeDocumentStatus(String(payload.status ?? target.status ?? "D"))
+      const nextIsConfirmed = payload.isConfirmed ?? target.isConfirmed ?? 0
+      const nextConfirmedBy = String(payload.confirmedBy ?? target.confirmedBy ?? "").trim()
+      const nextConfirmedDateTime = String(
+        payload.confirmedDateTime ?? target.confirmedDateTime ?? ""
+      ).trim()
+
+      setDocumentStatus(nextStatus)
+      setIsConfirmed(nextIsConfirmed)
+      setConfirmedBy(nextConfirmedBy)
+      setConfirmedDateTime(nextConfirmedDateTime)
+      setLines(fetchedLines)
+      setDocuments((prev) =>
+        prev.map((doc) =>
+          doc.documentNo === documentNo
+            ? {
+                ...doc,
+                status: nextStatus,
+                isConfirmed: nextIsConfirmed,
+                confirmedBy: nextConfirmedBy,
+                confirmedDateTime: nextConfirmedDateTime,
+                hasSavedDraft: nextStatus === "D",
+                lines: fetchedLines,
+                lineCount: fetchedLines.length,
+              }
+            : doc
+        )
+      )
+    } catch {
+      toast.error("Failed to load document lines.")
+    }
+  }
 
   React.useEffect(() => {
     let isMounted = true
@@ -317,6 +608,10 @@ export default function InboundPage() {
   }, [])
 
   React.useEffect(() => {
+    void loadReceivingDocuments()
+  }, [loadReceivingDocuments])
+
+  React.useEffect(() => {
     setCustomerPage((prev) => Math.min(prev, totalCustomerPages))
   }, [totalCustomerPages])
 
@@ -332,13 +627,25 @@ export default function InboundPage() {
     setPalletPage((prev) => Math.min(prev, totalPalletPages))
   }, [totalPalletPages])
 
+  React.useEffect(() => {
+    setDocumentPage((prev) => Math.min(prev, totalDocumentPages))
+  }, [totalDocumentPages])
+
   const onDocStatusChange = (value: string) => {
     const next = value as DocumentStatus
     if (putAwayStatus === "NOT_PUTAWAY" && next !== "CN") {
       setDocumentStatus("D")
+      const currentDocumentNo = header.documentNo.trim()
+      if (currentDocumentNo) {
+        upsertDocumentFromCurrentState(currentDocumentNo, "D", hasSavedDraft)
+      }
       return
     }
     setDocumentStatus(next)
+    const currentDocumentNo = header.documentNo.trim()
+    if (currentDocumentNo) {
+      upsertDocumentFromCurrentState(currentDocumentNo, next, hasSavedDraft)
+    }
   }
 
   const onHeaderChange = (key: keyof InboundHeader, value: string) => {
@@ -641,12 +948,22 @@ export default function InboundPage() {
 
   const onConfirm = () => {
     if (putAwayStatus === "NOT_PUTAWAY") return
-    setDocumentStatus("C")
+    const nextStatus: DocumentStatus = "C"
+    setDocumentStatus(nextStatus)
+    const currentDocumentNo = header.documentNo.trim()
+    if (currentDocumentNo) {
+      upsertDocumentFromCurrentState(currentDocumentNo, nextStatus, hasSavedDraft)
+    }
   }
 
   const onCancel = () => {
     if (!editable) return
-    setDocumentStatus("CN")
+    const nextStatus: DocumentStatus = "CN"
+    setDocumentStatus(nextStatus)
+    const currentDocumentNo = header.documentNo.trim()
+    if (currentDocumentNo) {
+      upsertDocumentFromCurrentState(currentDocumentNo, nextStatus, hasSavedDraft)
+    }
   }
 
   const validateDraftLocally = (): {
@@ -932,20 +1249,27 @@ export default function InboundPage() {
       return
     }
 
+    const resolvedDocumentNo = header.documentNo.trim() || createDocumentNo()
+    if (resolvedDocumentNo !== header.documentNo) {
+      setHeader((prev) => ({ ...prev, documentNo: resolvedDocumentNo }))
+    }
     setDocumentStatus("D")
     setHasSavedDraft(true)
+    setSelectedDocumentNo(resolvedDocumentNo)
+    upsertDocumentFromCurrentState(resolvedDocumentNo, "D", true)
     setIsSavingDraft(false)
     toast.success(hasSavedDraft ? "Draft updated." : "Draft saved.")
   }
 
   const onRemoveDraft = () => {
     if (!editable) return
-    setHeader(initialHeader)
-    setLines([])
-    setDocumentStatus("D")
-    setHasSavedDraft(false)
-    setHeaderErrors({})
-    setLineErrors({})
+    const currentDocumentNo = header.documentNo.trim()
+    if (currentDocumentNo) {
+      setDocuments((prev) => prev.filter((doc) => doc.documentNo !== currentDocumentNo))
+    }
+    setSelectedDocumentNo(null)
+    resetDocumentEditor()
+    setDocumentSheetOpen(false)
   }
 
   return (
@@ -954,6 +1278,180 @@ export default function InboundPage() {
       <div className="flex flex-1 flex-col">
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Inbound Overview</CardTitle>
+                <CardDescription>Inbound documents grid header and quick totals.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-md border bg-muted/20 p-3">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">Total Documents</p>
+                    <p className="mt-1 text-2xl font-semibold">{totalDocuments}</p>
+                  </div>
+                  <div className="rounded-md border bg-muted/20 p-3">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">Draft</p>
+                    <p className="mt-1 text-2xl font-semibold">{draftDocumentCount}</p>
+                  </div>
+                  <div className="rounded-md border bg-muted/20 p-3">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">Confirmed</p>
+                    <p className="mt-1 text-2xl font-semibold">{confirmedDocumentCount}</p>
+                  </div>
+                  <div className="rounded-md border bg-muted/20 p-3">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">Cancelled</p>
+                    <p className="mt-1 text-2xl font-semibold">{cancelledDocumentCount}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <CardTitle>Inbound Documents</CardTitle>
+                    <CardDescription>
+                      Click any row or document number to open the document details sheet.
+                    </CardDescription>
+                  </div>
+                  <Button type="button" size="sm" onClick={onCreateDocument}>
+                    <Plus className="size-4" />
+                    New Document
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="max-h-130 overflow-auto rounded-lg border">
+                  <Table className="min-w-245">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-48">Document No</TableHead>
+                        <TableHead className="min-w-56">Customer</TableHead>
+                        <TableHead className="min-w-36">Receiving Type</TableHead>
+                        <TableHead className="min-w-32">Status</TableHead>
+                        <TableHead className="text-right">Lines</TableHead>
+                        <TableHead className="text-right">Total Qty</TableHead>
+                        <TableHead className="text-right">Total Heads</TableHead>
+                        <TableHead className="text-right">Total Weight</TableHead>
+                        <TableHead className="min-w-56">Updated At</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoadingDocuments ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="h-24 text-center">
+                            <p className="text-muted-foreground text-sm">Loading inbound documents...</p>
+                          </TableCell>
+                        </TableRow>
+                      ) : documents.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="h-24 text-center">
+                            <p className="text-muted-foreground text-sm">No inbound documents yet.</p>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        pagedDocuments.map((document) => (
+                          <TableRow
+                            key={document.documentNo}
+                            className="hover:bg-muted/30 cursor-pointer"
+                            onClick={() => onOpenDocument(document.documentNo)}
+                          >
+                            <TableCell>
+                              <button
+                                type="button"
+                                className="text-primary font-medium underline-offset-4 hover:underline"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  onOpenDocument(document.documentNo)
+                                }}
+                              >
+                                {document.documentNo}
+                              </button>
+                            </TableCell>
+                            <TableCell>{document.header.customerName || document.header.customerNo || "-"}</TableCell>
+                            <TableCell>{RECEIVING_TYPE_LABELS[document.header.receivingType]}</TableCell>
+                            <TableCell>{document.status} - {DOCUMENT_STATUS_LABELS[document.status]}</TableCell>
+                            <TableCell className="text-right">{document.lineCount}</TableCell>
+                            <TableCell className="text-right">{document.totalQty}</TableCell>
+                            <TableCell className="text-right">{document.totalHeads}</TableCell>
+                            <TableCell className="text-right">{document.totalWeight}</TableCell>
+                            <TableCell>{document.updatedAt || "-"}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                {!isLoadingDocuments && documents.length > 0 && (
+                  <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-muted-foreground md:grid-cols-[1fr_auto_1fr] md:items-center">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="inbound-document-rows">Rows</Label>
+                      <Select
+                        value={String(documentPageSize)}
+                        onValueChange={(value) => {
+                          setDocumentPageSize(Number(value))
+                          setDocumentPage(1)
+                        }}
+                      >
+                        <SelectTrigger id="inbound-document-rows" className="h-8 w-20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="text-center">
+                      Page {documentPage} of {totalDocumentPages}
+                    </div>
+                    <div className="flex items-center justify-start gap-2 md:justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDocumentPage((prev) => Math.max(1, prev - 1))}
+                        disabled={documentPage === 1}
+                      >
+                        Prev
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDocumentPage((prev) => Math.min(totalDocumentPages, prev + 1))}
+                        disabled={documentPage === totalDocumentPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Sheet
+              open={documentSheetOpen}
+              onOpenChange={(open) => {
+                setDocumentSheetOpen(open)
+                if (!open) {
+                  closeLineForm()
+                  setCustomerPickerOpen(false)
+                  setItemPickerOpen(false)
+                  setLocationPickerOpen(false)
+                  setPalletPickerOpen(false)
+                }
+              }}
+            >
+              <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-[92vw]">
+                <SheetHeader>
+                  <SheetTitle>{selectedDocumentNo ?? "Inbound Document Details"}</SheetTitle>
+                  <SheetDescription>
+                    Manage inbound header and line details in this sheet.
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-4">
             <Card>
               <CardContent className="pt-6">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -1156,7 +1654,7 @@ export default function InboundPage() {
               </CardHeader>
               <CardContent>
                 <div className="h-105 overflow-auto rounded-lg border">
-                  <Table className="min-w-[1180px]">
+                  <Table className="min-w-295">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-14">#</TableHead>
@@ -1203,7 +1701,7 @@ export default function InboundPage() {
                           </TableCell>
                           <TableCell>
                             <div
-                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-sm whitespace-normal break-words"
+                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-sm whitespace-normal wrap-break-word"
                               title={line.itemName}
                             >
                               {line.itemName || "-"}
@@ -1211,7 +1709,7 @@ export default function InboundPage() {
                           </TableCell>
                           <TableCell>
                             <div
-                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-sm whitespace-normal break-words"
+                              className="border-input bg-muted/20 min-h-9 rounded-md border px-3 py-2 text-sm whitespace-normal wrap-break-word"
                               title={line.receivingCategory}
                             >
                               {line.receivingCategory || "-"}
@@ -1733,6 +2231,9 @@ export default function InboundPage() {
                 </div>
               </div>
             )}
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>

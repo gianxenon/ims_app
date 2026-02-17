@@ -5,6 +5,29 @@ import { Send } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/src/components/ui/button"
 
+type SendSampleEmailErrorPayload = {
+  message?: unknown
+  id?: unknown
+  detail?: unknown
+  error?: unknown
+}
+
+function toErrorDetail(value: unknown): string {
+  if (typeof value === "string") return value
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  if (!value || typeof value !== "object") return ""
+
+  const objectValue = value as { message?: unknown; error?: unknown }
+  if (typeof objectValue.message === "string") return objectValue.message
+  if (typeof objectValue.error === "string") return objectValue.error
+
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return "[unserializable error detail]"
+  }
+}
+
 export function SendSampleEmailButton({
   company,
   branch,
@@ -25,17 +48,26 @@ export function SendSampleEmailButton({
         body: JSON.stringify({ company, branch }),
       })
 
-      const payload = (await res.json()) as { message?: string; id?: string; detail?: unknown; error?: string }
+      const rawBody = await res.text()
+      let payload: SendSampleEmailErrorPayload | null = null
+      try {
+        payload = rawBody ? (JSON.parse(rawBody) as SendSampleEmailErrorPayload) : null
+      } catch {
+        payload = null
+      }
+
       if (!res.ok) {
-        const detail =
-          typeof payload.detail === "string"
-            ? payload.detail
-            : typeof payload.error === "string"
-              ? payload.error
-              : ""
-        const msg = payload.message ?? "Failed to send sample email."
+        const detail = toErrorDetail(payload?.detail ?? payload?.error ?? rawBody)
+        const msg =
+          typeof payload?.message === "string" && payload.message
+            ? payload.message
+            : `Failed to send sample email (HTTP ${res.status}).`
         toast.error(detail ? `${msg}: ${detail}` : msg)
-        console.error("[send-sample-email] failed", payload)
+        console.error("[send-sample-email] failed", {
+          status: res.status,
+          payload,
+          rawBody,
+        })
         return
       }
 
