@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { callPhp } from "@/src/lib/php-client"
+import { callPhp } from "@/src/infrastructure/php-client"
 
 export async function GET() {
   const result = await callPhp({

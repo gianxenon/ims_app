@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { isSessionJwtValid } from "@/src/lib/auth/session"
+import { isSessionJwtValid } from "@/src/shared/auth/session"
 
 export async function GET() {
   const cookieStore = await cookies()

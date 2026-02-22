@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { callPhp } from "@/src/lib/php-client"
+import { callPhp } from "@/src/infrastructure/php-client"
 
 const lineSchema = z.object({
   u_batch: z.string().optional(),

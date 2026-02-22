@@ -1,7 +1,7 @@
 import { cookies } from "next/headers"
-import { CurrentStockTable } from "@/src/features/dashboard/ui/current-stock-table" 
+import { CurrentStockTable } from "@/src/ui/features/dashboard/current-stock/current-stock-table"
 import { SiteHeader } from "@/src/components/site-header"
-import { RoomSectionCardsContainer } from "@/src/features/dashboard/ui/room-section-cards-container"
+import { RoomSectionCardsContainer } from "@/src/ui/features/dashboard/room-summary/room-section-cards-container"
 
 export default async function DashboardPage() {
   const cookieStore = await cookies()

@@ -9,7 +9,7 @@ import {
   type ActiveBranchSelection,
   persistActiveSelection,
   readActiveSelection,
-} from "@/src/lib/active-branch"
+} from "@/src/shared/active-branch"
 
 import {
   Collapsible,

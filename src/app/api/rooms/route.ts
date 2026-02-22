@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { callPhp, extractPhpRows } from "@/src/lib/php-client"
+import { callPhp, extractPhpRows } from "@/src/infrastructure/php-client"
 
 const roomApiRowSchema = z.looseObject({
     RoomCode: z.string().optional(),
@@ -29,6 +29,10 @@ export async function GET(req: Request) {
     const url = new URL(req.url)
     const company = url.searchParams.get("company")  ?? ""
     const branch = url.searchParams.get("branch") ?? ""
+    const customerNo = url.searchParams.get("customerNo") ?? ""
+    const itemNo = url.searchParams.get("itemNo") ?? ""
+    const batch = url.searchParams.get("batch") ?? ""
+    const location = url.searchParams.get("location") ?? ""
 
     if (!company || !branch) {
       return NextResponse.json(
@@ -37,13 +41,18 @@ export async function GET(req: Request) {
       )
     }
 
-    const phpResult = await callPhp({
-      payload: {
-        type: "fetchroomsummary",
-        company,
-        branch,
-      },
-    })
+    const payload: Record<string, unknown> = {
+      type: "fetchroomsummary",
+      company,
+      branch,
+    }
+
+    if (customerNo) payload.customerNo = customerNo
+    if (itemNo) payload.itemNo = itemNo
+    if (batch) payload.batch = batch
+    if (location) payload.location = location
+
+    const phpResult = await callPhp({ payload })
 
     if (!phpResult.ok) {
       return NextResponse.json(

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { AppSidebar } from "@/src/components/app-sidebar"
 import { GlobalServerBanner } from "@/src/components/global-server-banner"
 import { SidebarInset, SidebarProvider } from "@/src/components/ui/sidebar"
-import { isSessionJwtValid } from "@/src/lib/auth/session"
+import { isSessionJwtValid } from "@/src/shared/auth/session"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies()

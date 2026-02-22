@@ -3,7 +3,11 @@
 import * as React from "react"
 import { ChevronsUpDown, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { persistActiveSelection, readActiveSelection } from "@/src/lib/active-branch"
+import {
+  ACTIVE_BRANCH_EVENT,
+  persistActiveSelection,
+  readActiveSelection,
+} from "@/src/shared/active-branch"
 
 import {
   DropdownMenu,
@@ -39,6 +43,16 @@ export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
   const [activeTeam, setActiveTeam] = React.useState<TeamItem | undefined>(teams[0])
   const [isSwitching, setIsSwitching] = React.useState(false)
   const switchCounterRef = React.useRef(0)
+
+  const findTeamByCodes = React.useCallback(
+    (companyCode: string, branchCode: string): TeamItem | undefined =>
+      teams.find(
+        (t) =>
+          normalizeCode(t.companyCode) === normalizeCode(companyCode) &&
+          normalizeCode(t.branchCode) === normalizeCode(branchCode)
+      ),
+    [teams]
+  )
 
   const waitForBranchResponse = React.useCallback(async (team: TeamItem) => {
     const startedAt = Date.now()
@@ -97,14 +111,33 @@ export function TeamSwitcher({ teams }: { teams: TeamItem[] }) {
     const savedCompany = saved?.companyCode ?? ""
     const savedBranch = saved?.branchCode ?? ""
 
-    const matched = teams.find(
-      (t) =>
-        normalizeCode(t.companyCode) === normalizeCode(savedCompany) &&
-        normalizeCode(t.branchCode) === normalizeCode(savedBranch)
-    )
+    const matched = findTeamByCodes(savedCompany, savedBranch)
+    setActiveTeam(matched ?? teams[0])
+  }, [teams, findTeamByCodes])
 
-    applyActiveTeam(matched, { refresh: false, persist: false })
-  }, [teams, applyActiveTeam])
+  React.useEffect(() => {
+    const onBranchChanged = (event: Event) => {
+      if (teams.length === 0) return
+
+      const customEvent = event as CustomEvent<{ companyCode?: string; branchCode?: string }>
+      const companyCode = customEvent.detail?.companyCode?.trim() ?? ""
+      const branchCode = customEvent.detail?.branchCode?.trim() ?? ""
+      if (!companyCode || !branchCode) {
+        setActiveTeam(undefined)
+        return
+      }
+
+      const matched = findTeamByCodes(companyCode, branchCode)
+      if (matched) {
+        setActiveTeam(matched)
+      }
+    }
+
+    window.addEventListener(ACTIVE_BRANCH_EVENT, onBranchChanged as EventListener)
+    return () => {
+      window.removeEventListener(ACTIVE_BRANCH_EVENT, onBranchChanged as EventListener)
+    }
+  }, [teams.length, findTeamByCodes])
 
   if (!activeTeam && teams.length === 0) {
     return (

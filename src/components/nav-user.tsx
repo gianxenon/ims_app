@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { clearActiveSelection } from "@/src/shared/active-branch"
 
 import {
   Avatar,
@@ -47,6 +48,7 @@ export function NavUser({
     try {
       await fetch("/api/auth/logout", { method: "POST" })
     } finally {
+      clearActiveSelection()
       router.replace("/login")
       router.refresh()
     }

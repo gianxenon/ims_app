@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { z } from "zod"
-import { isSessionJwtValid } from "@/src/lib/auth/session"
-import { callPhp } from "@/src/lib/php-client"
+import { isSessionJwtValid } from "@/src/shared/auth/session"
+import { callPhp } from "@/src/infrastructure/php-client"
 
 const phpProfileUserSchema = z.looseObject({
     userid: z.string().optional(),

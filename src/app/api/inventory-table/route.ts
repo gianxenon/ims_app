@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { callPhp, extractPhpRows } from "@/src/lib/php-client"
+import { callPhp, extractPhpRows } from "@/src/infrastructure/php-client"
 
 const zText = z.union([z.string(), z.number(), z.null()]).optional()
 const zNumeric = z.union([z.string(), z.number(), z.null()]).optional()

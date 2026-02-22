@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { callPhp, extractPhpRows } from "@/src/lib/php-client"
+import { callPhp, extractPhpRows } from "@/src/infrastructure/php-client"
 
 const locationApiRowSchema = z.looseObject({
   CODE: z.string().optional(),

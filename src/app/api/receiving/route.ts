@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
-import { callPhp, extractPhpRows } from "@/src/lib/php-client"
+import { callPhp, extractPhpRows } from "@/src/infrastructure/php-client"
 
 const headerRowSchema = z.looseObject({
   DOCID: z.union([z.string(), z.number()]).optional(),

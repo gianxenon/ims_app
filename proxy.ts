@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { isSessionJwtValid } from "./src/lib/auth/session"
+import { isSessionJwtValid } from "./src/shared/auth/session"
 
 export function proxy(req: NextRequest) {
   const session = req.cookies.get("session")?.value
