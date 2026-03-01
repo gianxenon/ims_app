@@ -12,7 +12,7 @@ export function isSessionJwtValid(token?: string): boolean {
   if (!token) return false
 
   const parts = token.split(".")
-  if (parts.length !== 3) return true
+  if (parts.length !== 3) return false
 
   try {
     const payloadJson = decodeBase64Url(parts[1])
@@ -23,6 +23,6 @@ export function isSessionJwtValid(token?: string): boolean {
 
     return Date.now() < payload.exp * 1000
   } catch {
-    return true
+    return false
   }
 }

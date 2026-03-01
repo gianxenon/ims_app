@@ -1,0 +1,89 @@
+src/
+│
+├── app/
+│   │
+│   ├── layout.tsx            # Root layout (imports globals.css)
+│   ├── page.tsx              # Optional landing or redirect
+│   ├── globals.css
+│   │
+│   ├── (auth)/               # Public routes (no sidebar)
+│   │   └── login/
+│   │       └── page.tsx
+│   │
+│   ├── (app)/                # Protected routes (with sidebar)
+│   │   ├── layout.tsx        # App shell layout (sidebar + header)
+│   │   │
+│   │   ├── dashboard/
+│   │   │   └── page.tsx
+│   │   │
+│   │   ├── inventory/
+│   │   │   └── page.tsx
+│   │   │
+│   │   ├── sales-order/
+│   │   │   ├── page.tsx
+│   │   │   ├── create/
+│   │   │   │   └── page.tsx
+│   │   │   └── [id]/
+│   │   │       └── page.tsx
+│   │   │
+│   │   └── users/
+│   │       └── page.tsx
+│   │
+│   └── api/                  # (Optional for later full Next backend)
+│       ├── auth/
+│       │   ├── login/route.ts
+│       │   ├── me/route.ts
+│       │   └── logout/route.ts
+│       │
+│       ├── inventory/
+│       │   └── route.ts
+│       │
+│       └── sales-order/
+│           └── route.ts
+│
+├── components/
+│   │
+│   ├── layout/
+│   │   ├── app-shell.tsx     # Sidebar + header wrapper
+│   │   ├── sidebar.tsx
+│   │   └── topbar.tsx
+│   │
+│   ├── forms/
+│   │   ├── login-form.tsx
+│   │   └── sales-order-form.tsx
+│   │
+│   ├── tables/
+│   │   ├── inventory-table.tsx
+│   │   └── sales-order-table.tsx
+│   │
+│   └── ui/                   # shadcn components
+│       ├── button.tsx
+│       ├── card.tsx
+│       ├── input.tsx
+│       ├── label.tsx
+│       └── ...
+│
+├── lib/
+│   ├── api.ts                # Axios instance
+│   ├── auth.ts               # Token helpers
+│   ├── permissions.ts        # Role rules
+│   ├── constants.ts
+│   └── utils.ts
+│
+├── store/
+│   ├── auth-store.ts
+│   └── ui-store.ts
+│
+├── types/
+│   ├── user.ts
+│   ├── inventory.ts
+│   ├── sales-order.ts
+│   └── api.ts
+│
+├── hooks/
+│   ├── use-auth.ts
+│   └── use-permission.ts
+│
+├── middleware.ts             # Protect routes
+│
+└── env.d.ts                  # Type support for env variables

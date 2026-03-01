@@ -3,10 +3,6 @@ import { z } from "zod"
 
 import { callPhp, extractPhpRows } from "@/src/infrastructure/php-client"
 
-type ReceivingMutationType = "receivingdraftadd" | "receivingdraftupdate"
-
-const receivingMutationTypeSchema = z.enum(["receivingdraftadd", "receivingdraftupdate"])
-
 const headerRowSchema = z.looseObject({
   DOCID: z.union([z.string(), z.number()]).optional(),
   DOCNO: z.union([z.string(), z.number()]).optional(),
@@ -57,45 +53,6 @@ const lineRowSchema = z.looseObject({
   LOCATION: z.union([z.string(), z.number()]).optional(),
 })
 
-const webHeaderSchema = z.looseObject({
-  docstatus: z.string().optional(),
-  documentNo: z.string().optional(),
-  customerNo: z.string().optional(),
-  customerName: z.string().optional(),
-  customerGroup: z.string().optional(),
-  receivingType: z.string().optional(),
-  seriesName: z.string().optional(),
-  palletId: z.string().optional(),
-  location: z.string().optional(),
-  remarks: z.string().optional(),
-  totalQty: z.union([z.string(), z.number()]).optional(),
-  totalHeads: z.union([z.string(), z.number()]).optional(),
-  totalWeight: z.union([z.string(), z.number()]).optional(),
-})
-
-const webLineSchema = z.looseObject({
-  lineNo: z.union([z.string(), z.number()]).optional(),
-  tagNo: z.string().optional(),
-  itemNo: z.string().optional(),
-  itemName: z.string().optional(),
-  receivingCategory: z.string().optional(),
-  prdDate: z.union([z.string(), z.null()]).optional(),
-  expDate: z.union([z.string(), z.null()]).optional(),
-  quantity: z.union([z.string(), z.number()]).optional(),
-  heads: z.union([z.string(), z.number()]).optional(),
-  weight: z.union([z.string(), z.number()]).optional(),
-  palletId: z.string().optional(),
-  location: z.string().optional(),
-})
-
-const webPayloadSchema = z.object({
-  type: receivingMutationTypeSchema.optional(),
-  company: z.string().optional(),
-  branch: z.string().optional(),
-  header: webHeaderSchema,
-  lines: z.array(webLineSchema).min(1),
-})
-
 function pickParam(url: URL, key: string): string {
   return url.searchParams.get(key)?.trim() ?? ""
 }
@@ -104,31 +61,16 @@ function str(value: unknown): string {
   return value === null || value === undefined ? "" : String(value)
 }
 
-function clean(value: unknown): string {
-  return str(value).trim()
-}
-
 function num(value: unknown): number {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
-function pickMutationType(value: unknown): ReceivingMutationType {
-  const parsed = receivingMutationTypeSchema.safeParse(value)
-  return parsed.success ? parsed.data : "receivingdraftadd"
-}
-
-function pickCompanyBranch(payload: { company?: string; branch?: string }) {
-  const company = clean(payload.company) || clean(process.env.PHP_COMPANY)
-  const branch = clean(payload.branch) || clean(process.env.PHP_BRANCH)
-  return { company, branch }
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
 }
 
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
-    const company = pickParam(url, "company") || ""
-    const branch = pickParam(url, "branch") || ""
+    const company = pickParam(url, "company")  || ""
+    const branch = pickParam(url, "branch")   || ""
     const documentNo = pickParam(url, "documentNo") || pickParam(url, "docno")
     const dateFrom = pickParam(url, "dateFrom") || pickParam(url, "date_from")
     const dateTo = pickParam(url, "dateTo") || pickParam(url, "date_to")
@@ -243,52 +185,5 @@ export async function GET(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ message: "Failed to load receiving data", error: message }, { status: 500 })
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const rawBody = await req.json()
-    const parsedBody = webPayloadSchema.safeParse(rawBody)
-    if (!parsedBody.success) {
-      return NextResponse.json(
-        { message: "Invalid web receiving payload", issues: parsedBody.error.issues },
-        { status: 400 }
-      )
-    }
-
-    const body = parsedBody.data
-    const { company, branch } = pickCompanyBranch(body)
-    if (!company || !branch) {
-      return NextResponse.json(
-        { message: "Missing company/branch. Provide in body or configure PHP_COMPANY/PHP_BRANCH." },
-        { status: 400 }
-      )
-    }
-
-    const phpPayload = {
-      type: pickMutationType(body.type),
-      company,
-      branch,
-      header: body.header,
-      lines: body.lines,
-    }
-
-    const phpResult = await callPhp({ payload: phpPayload })
-
-    if (!phpResult.ok) {
-      return NextResponse.json(
-        { message: "Receiving API failed", error: phpResult.error, raw: phpResult.raw },
-        { status: phpResult.status }
-      )
-    }
-
-    return NextResponse.json({
-      ok: true,
-      result: phpResult.parsed,
-    })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ message: "Receiving route crashed", error: message }, { status: 500 })
   }
 }
