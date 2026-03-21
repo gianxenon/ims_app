@@ -107,6 +107,7 @@ export function CurrentStockTable({
     if (!q) return palletOptions
     return palletOptions.filter((p) => p.code.toLowerCase().includes(q))
   }, [palletOptions, batchSearch])
+  
   const filteredLocations = React.useMemo(() => {
     const q = locationSearch.trim().toLowerCase()
     if (!q) return locationOptions

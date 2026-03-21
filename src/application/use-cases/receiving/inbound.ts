@@ -9,15 +9,17 @@ import type {
 } from "@/src/domain/receiving/inbound"
 import type { InboundDocumentRecord } from "@/src/application/dto/receiving/inbound"
 import {
-  // fetchCustomers,
-  // fetchItems,
-  // fetchLocations,
-  // fetchPalletAddresses,
+ // fetchCustomers,
+ // fetchItems,
+ // fetchLocations,
+ // fetchPalletAddresses,
   fetchReceivingDocumentLines,
   fetchReceivingDocuments,
-  // validateLocation as validateLocationRequest,
-  // validateReceivingDraft as validateReceivingDraftRequest,
+ // validateLocation as validateLocationRequest,
+  validateReceivingDraft as validateReceivingDraftRequest,
 } from "@/src/infrastructure/data-sources/receiving/inbound"
+
+import { fetchCustomers, fetchItems, fetchLocations, fetchPalletAddresses, validateLocation as validateLocationRequest } from "@/src/infrastructure/data-sources/shared/options"
 
 // Normalize backend status values into allowed status codes.
 function normalizeDocumentStatus(value: string): DocumentStatus {
@@ -55,8 +57,7 @@ export async function loadReceivingDocuments(company: string, branch: string) {
       const confirmedDateTime = String(doc.confirmedDateTime ?? "").trim()
       const updatedAt =
         String(doc.systemReceivingDate ?? "").trim() ||
-        String(doc.documentReceivingDate ?? "").trim() ||
-        ""
+        String(doc.documentReceivingDate ?? "").trim() || ""
 
       return {
         documentNo: String(doc.documentNo ?? "").trim(),
@@ -127,69 +128,69 @@ export async function loadReceivingDocumentLines(
   }
 }
 
-// // Load picker options (customers/items/locations/pallets).
-// export async function loadCustomers(company: string, branch: string): Promise<CustomerOption[]> {
-//   const result = await fetchCustomers(company, branch)
-//   if (!result.ok) return []
-//   return (result.data.customers ?? []) as CustomerOption[]
-// }
+// Load picker options (customers/items/locations/pallets).
+export async function loadCustomers(company: string, branch: string): Promise<CustomerOption[]> {
+  const result = await fetchCustomers(company, branch)
+  if (!result.ok) return []
+  return (result.data.customers ?? []) as CustomerOption[]
+}
 
-// export async function loadItems(company: string, branch: string): Promise<ItemOption[]> {
-//   const result = await fetchItems(company, branch)
-//   if (!result.ok) return []
-//   return (result.data.items ?? []) as ItemOption[]
-// }
+export async function loadItems(company: string, branch: string): Promise<ItemOption[]> {
+  const result = await fetchItems(company, branch)
+  if (!result.ok) return []
+  return (result.data.items ?? []) as ItemOption[]
+}
 
-// export async function loadLocations(company: string, branch: string): Promise<LocationOption[]> {
-//   const result = await fetchLocations(company, branch)
-//   if (!result.ok) return []
-//   return (result.data.locations ?? []) as LocationOption[]
-// }
+export async function loadLocations(company: string, branch: string): Promise<LocationOption[]> {
+  const result = await fetchLocations(company, branch)
+  if (!result.ok) return []
+  return (result.data.locations ?? []) as LocationOption[]
+}
 
-// export async function loadPalletAddresses(company: string, branch: string): Promise<PalletAddressOption[]> {
-//   const result = await fetchPalletAddresses(company, branch)
-//   if (!result.ok) return []
-//   return (result.data.pallets ?? []) as PalletAddressOption[]
-// }
+export async function loadPalletAddresses(company: string, branch: string): Promise<PalletAddressOption[]> {
+  const result = await fetchPalletAddresses(company, branch)
+  if (!result.ok) return []
+  return (result.data.pallets ?? []) as PalletAddressOption[]
+}
 
-// // Validate a location before saving.
-// export async function validateLocation(company: string, branch: string, location: string) {
-//   const result = await validateLocationRequest(company, branch, location)
-//   if (!result.ok) {
-//     return { ok: false as const, valid: false, message: result.message }
-//   }
-//   return {
-//     ok: true as const,
-//     valid: Boolean(result.data.valid),
-//     message: result.data.message ?? "",
-//   }
-// }
+// Validate a location before saving.
+export async function validateLocation(company: string, branch: string, location: string) {
+  const result = await validateLocationRequest(company, branch, location)
+  if (!result.ok) {
+    return { ok: false as const, valid: false, message: result.message }
+  }
+  return {
+    ok: true as const,
+    valid: Boolean(result.data.valid),
+    message: result.data.message ?? "",
+  }
+}
 
 // Validate a draft payload against server-side rules.
-// export async function validateReceivingDraft(
-//   company: string,
-//   branch: string,
-//   header: InboundHeader,
-//   lines: InboundLine[]
-// ) {
-//   const payload = {
-//     company,
-//     branch,
-//     lines: lines.map((line) => ({
-//       u_batch: header.palletId.trim(),
-//       u_location: header.location.trim(),
-//       u_tagno: line.tagNo.trim(),
-//     })),
-//   }
+export async function validateReceivingDraft(
+  company: string,
+  branch: string,
+  header: InboundHeader,
+  lines: InboundLine[]
+) {
+  const payload = {
+    company,
+    branch,
+    lines: lines.map((line) => ({
+      u_batch: header.palletId.trim(),
+      u_location: header.location.trim(),
+      u_tagno: line.tagNo.trim(),
+    })),
+  }
 
-//   const result = await validateReceivingDraftRequest(payload)
-//   if (!result.ok) {
-//     return { ok: false as const, message: result.message, errors: [] }
-//   }
+  const result = await validateReceivingDraftRequest(payload)
+  if (!result.ok) {
+    return { ok: false as const, message: result.message, errors: [] }
+  }
 
-//   return {
-//     ok: result.data.ok !== false,
-//     message: result.data.message ?? "",
-//     errors: result.data.errors ?? [],
-//   }
-// }
+  return {
+    ok: result.data.ok !== false,
+    message: result.data.message ?? "",
+    errors: result.data.errors ?? [],
+  }
+}

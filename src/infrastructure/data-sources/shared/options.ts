@@ -1,22 +1,7 @@
 // Infrastructure data source for shared option lists (customers, items, locations, pallets).
 import { requireBranchContext } from "@/src/infrastructure/data-sources/shared/branch-context"
-
-type ApiResult<T> = { ok: true; data: T } | { ok: false; message: string }
-
-async function getJson<T>(url: string): Promise<ApiResult<T>> {
-  try {
-    const res = await fetch(url, { cache: "no-store" })
-    const data = (await res.json()) as T
-    if (!res.ok) {
-      const message = (data as { message?: string })?.message ?? "Request failed"
-      return { ok: false, message }
-    }
-    return { ok: true, data }
-  } catch {
-    return { ok: false, message: "Request failed" }
-  }
-}
-
+ import { postJson ,getJson } from "@/src/infrastructure/php-client"
+ 
 function withCompanyBranch(base: string, company?: string, branch?: string) {
   const ctx = requireBranchContext(company, branch)
   if (!ctx.ok) return { ok: false as const, message: ctx.message }
@@ -50,4 +35,15 @@ export async function fetchPalletAddresses(company?: string, branch?: string) {
   const withContext = withCompanyBranch("/api/pallet-addresses", company, branch)
   if (!withContext.ok) return withContext
   return getJson<{ pallets?: Array<Record<string, unknown>> }>(withContext.url)
+}
+
+export async function validateLocation(company: string, branch: string, location: string) {
+  const ctx = requireBranchContext(company, branch)
+  if (!ctx.ok) return { ok: false as const, message: ctx.message }
+
+  return postJson<{ valid?: boolean; message?: string }>(`/api/location-validate`, {
+    company: ctx.company,
+    branch: ctx.branch,
+    location,
+  })
 }

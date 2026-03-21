@@ -25,6 +25,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@/src/components/ui/sidebar"
 
 export function NavMain({
@@ -53,6 +54,7 @@ export function NavMain({
   const [selection, setSelection] = React.useState<ActiveBranchSelection | null>(null)
   const [isBranchModalOpen, setIsBranchModalOpen] = React.useState(false)
   const [pendingUrl, setPendingUrl] = React.useState<string | null>(null)
+  const { state, setOpen } = useSidebar()
 
   React.useEffect(() => {
     setHasMounted(true)
@@ -138,6 +140,16 @@ export function NavMain({
     [buildBranchedUrl, pendingUrl, router]
   )
 
+  const handleMainItemClick = React.useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      if (state !== "collapsed") return
+      event.preventDefault()
+      event.stopPropagation()
+      setOpen(true)
+    },
+    [setOpen, state]
+  )
+
   return (
     <>
       {hasMounted && isBranchModalOpen && teams.length > 0 && (
@@ -184,7 +196,11 @@ export function NavMain({
               >
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip={item.title} isActive={itemActive}>
+                    <SidebarMenuButton
+                      tooltip={item.title}
+                      isActive={itemActive}
+                      onClick={handleMainItemClick}
+                    >
                       {item.icon && <item.icon />}
                       <span>{item.title}</span>
                       <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />

@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+type ApiResult<T> = { ok: true; data: T } | { ok: false; message: string }
+
 type PhpCallInput = {
   payload: Record<string, unknown>
   objectcode?: string
@@ -98,4 +100,37 @@ export function extractPhpRows(parsed: unknown): unknown[] {
 
   return []
 }
+ 
 
+export async function getJson<T>(url: string): Promise<ApiResult<T>> {
+  try {
+    const res = await fetch(url, { cache: "no-store" })
+    const data = (await res.json()) as T
+    if (!res.ok) {
+      const message = (data as { message?: string })?.message ?? "Request failed"
+      return { ok: false, message }
+    }
+    return { ok: true, data }
+  } catch {
+    return { ok: false, message: "Request failed" }
+  }
+}
+
+export async function postJson<T>(url: string, body: unknown): Promise<ApiResult<T>> {
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(body),
+    })
+    const data = (await res.json()) as T
+    if (!res.ok) {
+      const message = (data as { message?: string })?.message ?? "Request failed"
+      return { ok: false, message }
+    }
+    return { ok: true, data }
+  } catch {
+    return { ok: false, message: "Request failed" }
+  }
+}
