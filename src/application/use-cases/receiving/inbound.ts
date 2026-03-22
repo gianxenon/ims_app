@@ -19,7 +19,7 @@ import {
   validateReceivingDraft as validateReceivingDraftRequest,
 } from "@/src/infrastructure/data-sources/receiving/inbound"
 
-import { fetchCustomers, fetchItems, fetchLocations, fetchPalletAddresses, validateLocation as validateLocationRequest } from "@/src/infrastructure/data-sources/shared/options"
+import { fetchCustomers, fetchItems, fetchLocations, fetchPalletAddresses, validateLocation as validateLocationRequest, validatePalletAddress  as validatePalletAddressRequest } from "@/src/infrastructure/data-sources/shared/options"
 
 // Normalize backend status values into allowed status codes.
 function normalizeDocumentStatus(value: string): DocumentStatus {
@@ -165,6 +165,25 @@ export async function validateLocation(company: string, branch: string, location
     message: result.data.message ?? "",
   }
 }
+
+export async function validatePalletAddress(
+  company: string,
+  branch: string,
+  palletId: string,
+  docid?: number | string | null
+) {
+  const result = await validatePalletAddressRequest(company, branch, palletId, docid)
+  if (!result.ok) return { ok: false as const, valid: false, message: result.message }
+
+  const errors = result.data.errors ?? []
+  const palletErr = errors.find((e) => (e.field ?? "").includes("batch") || (e.field ?? "").includes("pallet"))
+  return {
+    ok: true as const,
+    valid: errors.length === 0,
+    message: palletErr?.message ?? errors[0]?.message ?? "",
+  }
+}
+
 
 // Validate a draft payload against server-side rules.
 export async function validateReceivingDraft(

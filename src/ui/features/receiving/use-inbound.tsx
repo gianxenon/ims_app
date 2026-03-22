@@ -14,6 +14,7 @@ import {
   loadReceivingDocumentLines,
   loadReceivingDocuments as loadReceivingDocumentsUseCase,
   validateLocation as validateLocationUseCase,
+  validatePalletAddress as validatePalletAddressUseCase,
   validateReceivingDraft as validateReceivingDraftUseCase,
 } from "@/src/application/use-cases/receiving/inbound"
 import {
@@ -36,6 +37,9 @@ type LineDraftErrorState = Partial<
   >
 >
 // Fully materialized document records are defined at the application layer.
+
+const createLineId = () =>
+  globalThis.crypto?.randomUUID?.() ?? `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
 export function useInbound() {
   // UI constants
@@ -96,7 +100,7 @@ export function useInbound() {
     [isConfirmed]
   )
   const effectiveStatus = normalizeStatus(documentStatus, putAwayStatus)
-  const editable = canEdit(documentStatus, putAwayStatus)
+  const editable = canEdit(documentStatus)
 
   // InboundSummary values
   const totalQty = React.useMemo(() => sumBy(lines, "quantity"), [lines])
@@ -599,6 +603,7 @@ export function useInbound() {
     setHeader((prev) => ({ ...prev, palletId: code }))
     setHeaderErrors((prev) => ({ ...prev, palletId: false }))
     setPalletPickerOpen(false)
+    void validateHeaderPallet(code)
   }
 
   const validateLineDraft = (): { issues: string[]; fields: LineDraftErrorState } => {
@@ -688,7 +693,7 @@ export function useInbound() {
         prev.map((line) => (line.id === editingLineId ? { ...nextLine, id: editingLineId } : line))
       )
     } else {
-      setLines((prev) => [...prev, { ...nextLine, id: crypto.randomUUID() }])
+      setLines((prev) => [...prev, { ...nextLine, id: createLineId() }])
     }
     closeLineForm()
   }
@@ -795,10 +800,15 @@ export function useInbound() {
   }
 
   const showDraftValidationErrors = (errors: string[]) => {
+    const normalized = errors.map((err) => String(err ?? "").trim()).filter((err) => err.length > 0)
+    const finalErrors =
+      normalized.length > 0
+        ? normalized
+        : ["Draft validation failed. Please review required fields and try again."]
     toast.error("Cannot save draft", {
       description: (
         <ul className="list-disc pl-4">
-          {errors.map((err, idx) => (
+          {finalErrors.map((err, idx) => (
             <li key={`${err}-${idx}`}>{err}</li>
           ))}
         </ul>
@@ -840,6 +850,34 @@ export function useInbound() {
     }
 
     setHeaderErrors((prev) => ({ ...prev, location: false }))
+  }
+
+  const validateHeaderPallet = async (palletValue: string) => {
+    if (!editable) return
+    const palletId = palletValue.trim()
+    if (!palletId) return
+
+    const readCookie = (name: string): string => {
+      const key = `${name}=`
+      const part = document.cookie
+        .split(";")
+        .map((v) => v.trim())
+        .find((v) => v.startsWith(key))
+      return part ? decodeURIComponent(part.slice(key.length)) : ""
+    }
+
+    const company = readCookie("active_company")
+    const branch = readCookie("active_branch")
+    if (!company || !branch) return
+
+    const result = await validatePalletAddressUseCase(company, branch, palletId, null)
+    if (!result.ok || !result.valid) {
+      setHeaderErrors((prev) => ({ ...prev, palletId: true }))
+      toast.error(result.message || "Pallet is invalid or already occupied.")
+      return
+    }
+
+    setHeaderErrors((prev) => ({ ...prev, palletId: false }))
   }
 
   const onSaveDraft = async () => {

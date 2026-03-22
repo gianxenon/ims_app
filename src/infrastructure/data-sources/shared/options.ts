@@ -1,7 +1,7 @@
 // Infrastructure data source for shared option lists (customers, items, locations, pallets).
 import { requireBranchContext } from "@/src/infrastructure/data-sources/shared/branch-context"
- import { postJson ,getJson } from "@/src/infrastructure/php-client"
- 
+import { getJson, postJson } from "@/src/infrastructure/php-client"
+
 function withCompanyBranch(base: string, company?: string, branch?: string) {
   const ctx = requireBranchContext(company, branch)
   if (!ctx.ok) return { ok: false as const, message: ctx.message }
@@ -46,4 +46,24 @@ export async function validateLocation(company: string, branch: string, location
     branch: ctx.branch,
     location,
   })
+}
+
+export async function validatePalletAddress(
+  company: string,
+  branch: string,
+  palletId: string,
+  docid?: number | string | null
+) {
+  const ctx = requireBranchContext(company, branch)
+  if (!ctx.ok) return { ok: false as const, message: ctx.message }
+
+  return postJson<{ ok?: boolean; errors?: Array<{ field?: string; message?: string }> }>(
+    `/api/pallet-validate`,
+    {
+      company: ctx.company,
+      branch: ctx.branch,
+      docid: docid ?? null,
+      u_batch: palletId,
+    }
+  )
 }

@@ -55,8 +55,8 @@ function mapIsConfirmedToPutAwayStatus(isConfirmed: unknown): PutAwayStatus {
 }
 
 // Only Draft documents that are not confirmed can be edited.
-function canEdit(status: DocumentStatus, putAwayStatus: PutAwayStatus): boolean {
-  return normalizeStatus(status, putAwayStatus) === "D"
+function canEdit(status: DocumentStatus): boolean {
+  return status === "D"
 }
 
 // Sum numeric fields across line items (guards against non-numeric inputs).

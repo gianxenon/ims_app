@@ -5,16 +5,14 @@ import { MoreHorizontal } from "lucide-react"
 import { Button } from "@/src/components/ui/button"
 import { Input } from "@/src/components/ui/input"
 import { Label } from "@/src/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/src/components/ui/sheet"
-import { RECEIVING_CATEGORY_VALUES } from "@/src/shared/transaction-enums"
 import { LookupModal } from "@/src/ui/features/document-grid/lookup-modal"
 import type { Column } from "@/src/ui/features/document-grid/ui-types"
-import type { ItemOption } from "@/src/domain/receiving/inbound"
-import type { InboundState } from "./use-inbound"
+import type { ItemOption } from "@/src/domain/orders/sales-order"
+import type { SalesOrderState } from "./use-sales-order"
 
-type InboundLineEditorSheetProps = Pick<
-  InboundState,
+type SalesOrderLineEditorSheetProps = Pick<
+  SalesOrderState,
   | "lineFormOpen"
   | "onLineFormOpenChange"
   | "itemPickerOpen"
@@ -35,7 +33,7 @@ type InboundLineEditorSheetProps = Pick<
   | "onSelectItem"
 >
 
-export function InboundLineEditorSheet({
+export function SalesOrderLineEditorSheet({
   lineFormOpen,
   onLineFormOpenChange,
   itemPickerOpen,
@@ -54,7 +52,7 @@ export function InboundLineEditorSheet({
   pagedItems,
   totalItemPages,
   onSelectItem,
-}: InboundLineEditorSheetProps) {
+}: SalesOrderLineEditorSheetProps) {
   const itemColumns: Column<ItemOption>[] = [
     { key: "itemNo", header: "Item No" },
     { key: "itemName", header: "Item Name" },
@@ -62,13 +60,7 @@ export function InboundLineEditorSheet({
 
   return (
     <Sheet open={lineFormOpen} onOpenChange={onLineFormOpenChange}>
-      <SheetContent
-        side="right"
-        className="w-full sm:max-w-xl"
-        onInteractOutside={(e) => {
-          if (itemPickerOpen) e.preventDefault()
-        }}
-      >
+      <SheetContent side="right" className="w-full sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>{editingLineId ? "Edit Line Item" : "Add Line Item"}</SheetTitle>
           <SheetDescription>
@@ -111,52 +103,13 @@ export function InboundLineEditorSheet({
             </div>
 
             <div className="space-y-1">
-              <Label>Tag No</Label>
-              <Input
-                className={lineDraftErrors.tagNo ? fieldErrorClass : undefined}
-                value={lineDraft.tagNo}
-                onChange={(e) => onLineDraftChange("tagNo", e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Receiving Category</Label>
-              <Select
-                value={lineDraft.receivingCategory}
-                onValueChange={(value) => onLineDraftChange("receivingCategory", value)}
-              >
-                <SelectTrigger className={lineDraftErrors.receivingCategory ? fieldErrorClass : undefined}>
-                  <SelectValue placeholder="Select receiving category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {RECEIVING_CATEGORY_VALUES.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>PRD</Label>
-              <Input
-                className={lineDraftErrors.prdDate ? fieldErrorClass : undefined}
-                type="date"
-                value={lineDraft.prdDate}
-                onChange={(e) => onLineDraftChange("prdDate", e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>EXP</Label>
-              <Input
-                className={lineDraftErrors.expDate ? fieldErrorClass : undefined}
-                type="date"
-                value={lineDraft.expDate}
-                onChange={(e) => onLineDraftChange("expDate", e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
               <Label>Qty</Label>
-              <Input type="number" value="1" readOnly disabled />
+              <Input
+                className={lineDraftErrors.quantity ? fieldErrorClass : undefined}
+                type="number"
+                value={lineDraft.quantity}
+                onChange={(e) => onLineDraftChange("quantity", e.target.value)}
+              />
             </div>
             <div className="space-y-1">
               <Label>Heads/Packs</Label>

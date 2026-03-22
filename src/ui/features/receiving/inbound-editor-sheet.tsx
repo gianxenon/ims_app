@@ -15,7 +15,6 @@ import {
 import { Input } from "@/src/components/ui/input"
 import { Label } from "@/src/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/src/components/ui/sheet"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/src/components/ui/table"
 import {
   DOCUMENT_STATUS_LABELS,
@@ -23,8 +22,75 @@ import {
   RECEIVING_TYPE_LABELS,
   RECEIVING_TYPE_VALUES,
 } from "@/src/shared/transaction-enums"
+import { DocumentSheet } from "@/src/ui/features/document-grid/document-sheet"
+import { LookupModal } from "@/src/ui/features/document-grid/lookup-modal"
+import type { Column } from "@/src/ui/features/document-grid/ui-types"
+import type { CustomerOption, LocationOption, PalletAddressOption } from "@/src/domain/receiving/inbound"
 import type { InboundState } from "./use-inbound"
 import { putAwayStatusLabel } from "./inbound-helpers"
+
+type InboundEditorSheetProps = Pick<
+  InboundState,
+  | "documentSheetOpen"
+  | "onDocumentSheetOpenChange"
+  | "selectedDocumentNo"
+  | "header"
+  | "headerErrors"
+  | "fieldErrorClass"
+  | "effectiveStatus"
+  | "onDocStatusChange"
+  | "putAwayStatus"
+  | "putAwayDetails"
+  | "onOpenCustomerPicker"
+  | "editable"
+  | "onHeaderChange"
+  | "onOpenPalletPicker"
+  | "onOpenLocationPicker"
+  | "lines"
+  | "lineErrors"
+  | "onOpenAddLine"
+  | "onEditLine"
+  | "onRemoveLine"
+  | "totalQty"
+  | "totalHeads"
+  | "totalWeight"
+  | "onConfirm"
+  | "onCancel"
+  | "onSaveDraft"
+  | "onRemoveDraft"
+  | "documentStatus"
+  | "isSavingDraft"
+  | "hasSavedDraft"
+  | "customerPickerOpen"
+  | "setCustomerPickerOpen"
+  | "customerSearch"
+  | "setCustomerSearch"
+  | "customerPage"
+  | "setCustomerPage"
+  | "pagedCustomers"
+  | "totalCustomerPages"
+  | "onSelectCustomer"
+  | "locationPickerOpen"
+  | "setLocationPickerOpen"
+  | "locationSearch"
+  | "setLocationSearch"
+  | "locationPage"
+  | "setLocationPage"
+  | "pagedLocations"
+  | "totalLocationPages"
+  | "onSelectLocation"
+  | "palletPickerOpen"
+  | "setPalletPickerOpen"
+  | "palletSearch"
+  | "setPalletSearch"
+  | "palletPage"
+  | "setPalletPage"
+  | "pagedPallets"
+  | "totalPalletPages"
+  | "onSelectPallet"
+>
+
+
 
 export function InboundEditorSheet({
   documentSheetOpen,
@@ -57,15 +123,54 @@ export function InboundEditorSheet({
   documentStatus,
   isSavingDraft,
   hasSavedDraft,
-}: InboundState) {
+  customerPickerOpen,
+  setCustomerPickerOpen,
+  customerSearch,
+  setCustomerSearch,
+  customerPage,
+  setCustomerPage,
+  pagedCustomers,
+  totalCustomerPages,
+  onSelectCustomer,
+  locationPickerOpen,
+  setLocationPickerOpen,
+  locationSearch,
+  setLocationSearch,
+  locationPage,
+  setLocationPage,
+  pagedLocations,
+  totalLocationPages,
+  onSelectLocation,
+  palletPickerOpen,
+  setPalletPickerOpen,
+  palletSearch,
+  setPalletSearch,
+  palletPage,
+  setPalletPage,
+  pagedPallets,
+  totalPalletPages,
+  onSelectPallet,
+}: InboundEditorSheetProps) {
+  const customerColumns: Column<CustomerOption>[] = [
+    { key: "customerNo", header: "Customer No" },
+    { key: "customerName", header: "Customer Name" },
+    { key: "groupName", header: "Customer Group" },
+  ]
+  const locationColumns: Column<LocationOption>[] = [{ key: "code", header: "Location" }]
+  const palletColumns: Column<PalletAddressOption>[] = [{ key: "code", header: "Pallet" }]
+  const isDraftStatus = documentStatus === "D"
+  const isNewDraft = isDraftStatus && !hasSavedDraft
+  const isLockedStatus = documentStatus !== "D"
+  const backendActionsReady = false
+
   return (
-    <Sheet open={documentSheetOpen} onOpenChange={onDocumentSheetOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-[92vw]">
-        <SheetHeader>
-          <SheetTitle>{selectedDocumentNo ?? "Inbound Document Details"}</SheetTitle>
-          <SheetDescription>Manage inbound header and line details in this sheet.</SheetDescription>
-        </SheetHeader>
-        <div className="mt-4 space-y-4">
+    <DocumentSheet
+      open={documentSheetOpen}
+      onOpenChange={onDocumentSheetOpenChange}
+      title={selectedDocumentNo ?? "Inbound Document Details"}
+      description="Manage inbound header and line details in this sheet."
+    >
+      <div className="mt-4 space-y-4">
           <Card>
             <CardContent className="pt-6">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -81,7 +186,7 @@ export function InboundEditorSheet({
                 </div>
                 <div className="space-y-1 md:justify-self-end md:w-full md:max-w-105">
                   <Label htmlFor="doc-status">Doc Status</Label>
-                  <Select value={effectiveStatus} onValueChange={onDocStatusChange}>
+                  <Select value={effectiveStatus} onValueChange={onDocStatusChange} disabled={!editable}>
                     <SelectTrigger id="doc-status" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
@@ -287,7 +392,14 @@ export function InboundEditorSheet({
                       </TableRow>
                     ) : (
                       lines.map((line, index) => (
-                        <TableRow key={line.id}>
+                        <TableRow
+                          key={line.id}
+                          className={editable ? "cursor-pointer hover:bg-muted/30" : undefined}
+                          onClick={() => {
+                            if (!editable) return
+                            onEditLine(line.id)
+                          }}
+                        >
                           <TableCell>{index + 1}</TableCell>
                           <TableCell>
                             <div
@@ -368,7 +480,10 @@ export function InboundEditorSheet({
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
-                                onClick={() => onEditLine(line.id)}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  onEditLine(line.id)
+                                }}
                                 disabled={!editable}
                                 aria-label="Edit line"
                               >
@@ -377,7 +492,10 @@ export function InboundEditorSheet({
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
-                                onClick={() => onRemoveLine(line.id)}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  onRemoveLine(line.id)
+                                }}
                                 disabled={!editable}
                                 aria-label="Remove line"
                               >
@@ -415,25 +533,102 @@ export function InboundEditorSheet({
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Document Action</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={onConfirm} disabled={putAwayStatus === "NOT_PUTAWAY"}>
-                      Confirm
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onCancel} disabled={!editable} variant="destructive">
-                      Cancel
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onSaveDraft} disabled={documentStatus === "CN" || isSavingDraft}>
+                    {isNewDraft ? null : (
+                      <>
+                        <DropdownMenuItem
+                          onClick={onConfirm}
+                          disabled={isLockedStatus || !backendActionsReady}
+                        >
+                          Confirm
+                        </DropdownMenuItem>
+                        {isDraftStatus ? null : (
+                          <DropdownMenuItem
+                            onClick={onCancel}
+                            disabled={isLockedStatus || !backendActionsReady}
+                            variant="destructive"
+                          >
+                            Cancel
+                          </DropdownMenuItem>
+                        )}
+                      </>
+                    )}
+                    <DropdownMenuItem
+                      onClick={onSaveDraft}
+                      disabled={isLockedStatus || isSavingDraft}
+                    >
                       {isSavingDraft ? "Validating..." : hasSavedDraft ? "Update Draft" : "Add Draft"}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onRemoveDraft} disabled={!editable}>
-                      Remove Draft
-                    </DropdownMenuItem>
+                    {isNewDraft ? null : (
+                      <DropdownMenuItem
+                        onClick={onRemoveDraft}
+                        disabled={!isDraftStatus || !backendActionsReady}
+                      >
+                        Remove Draft
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
             </CardContent>
           </Card>
-        </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+      <LookupModal
+        open={customerPickerOpen}
+        title="Select Customer"
+        rows={pagedCustomers}
+        columns={customerColumns}
+        rowKey={(row) => row.customerNo}
+        onSelect={(row) => onSelectCustomer(row.customerNo, row.customerName, row.groupName)}
+        onClose={() => setCustomerPickerOpen(false)}
+        searchPlaceholder="Search customer no, name, or group"
+        searchValue={customerSearch}
+        onSearchChange={(value) => {
+          setCustomerSearch(value)
+          setCustomerPage(1)
+        }}
+        page={customerPage}
+        totalPages={totalCustomerPages}
+        onPageChange={setCustomerPage}
+        emptyText="No customers found."
+      />
+      <LookupModal
+        open={locationPickerOpen}
+        title="Select Location"
+        rows={pagedLocations}
+        columns={locationColumns}
+        rowKey={(row) => row.code}
+        onSelect={(row) => onSelectLocation(row.code)}
+        onClose={() => setLocationPickerOpen(false)}
+        searchPlaceholder="Search location code"
+        searchValue={locationSearch}
+        onSearchChange={(value) => {
+          setLocationSearch(value)
+          setLocationPage(1)
+        }}
+        page={locationPage}
+        totalPages={totalLocationPages}
+        onPageChange={setLocationPage}
+        emptyText="No locations found."
+      />
+      <LookupModal
+        open={palletPickerOpen}
+        title="Select Pallet"
+        rows={pagedPallets}
+        columns={palletColumns}
+        rowKey={(row) => row.code}
+        onSelect={(row) => onSelectPallet(row.code)}
+        onClose={() => setPalletPickerOpen(false)}
+        searchPlaceholder="Search pallet code"
+        searchValue={palletSearch}
+        onSearchChange={(value) => {
+          setPalletSearch(value)
+          setPalletPage(1)
+        }}
+        page={palletPage}
+        totalPages={totalPalletPages}
+        onPageChange={setPalletPage}
+        emptyText="No pallet addresses found."
+      />
+    </DocumentSheet>
   )
 }
