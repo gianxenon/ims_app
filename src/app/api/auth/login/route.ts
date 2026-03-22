@@ -71,10 +71,17 @@ export async function POST(req: Request) {
         { status: 500 }
       )
     } 
+    const url = new URL(req.url)
+    const forwardedProto = req.headers.get("x-forwarded-proto")
+    const isHttps =
+      forwardedProto === "https" ||
+      url.protocol === "https:" ||
+      process.env.NEXT_PUBLIC_SITE_URL?.startsWith("https://") === true
+
     const res = NextResponse.json({ ok: true })
     res.cookies.set("session", jwt, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isHttps,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 3,

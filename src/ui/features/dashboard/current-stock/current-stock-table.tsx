@@ -86,6 +86,7 @@ export function CurrentStockTable({
   const [batchPage, setBatchPage] = React.useState(1)
   const [locationPage, setLocationPage] = React.useState(1)
 
+  // Filter and paginate options for customer, item, batch, and location pickers.
   const filteredCustomers = React.useMemo(() => {
     const q = customerSearch.trim().toLowerCase()
     if (!q) return customerOptions
@@ -95,6 +96,8 @@ export function CurrentStockTable({
       c.groupName.toLowerCase().includes(q)
     )
   }, [customerOptions, customerSearch])
+
+  // For items and batches, we allow searching by item number/name and batch code respectively.
   const filteredItems = React.useMemo(() => {
     const q = itemSearch.trim().toLowerCase()
     if (!q) return itemOptions
@@ -108,16 +111,20 @@ export function CurrentStockTable({
     return palletOptions.filter((p) => p.code.toLowerCase().includes(q))
   }, [palletOptions, batchSearch])
   
+  // For locations, we search by location code.
   const filteredLocations = React.useMemo(() => {
     const q = locationSearch.trim().toLowerCase()
     if (!q) return locationOptions
     return locationOptions.filter((l) => l.code.toLowerCase().includes(q))
   }, [locationOptions, locationSearch])
 
+  // Pagination for pickers
   const pagedCustomers = filteredCustomers.slice(
     (customerPage - 1) * pickerPageSize,
     customerPage * pickerPageSize
   )
+
+  // For items and batches, we allow searching by item number/name and batch code respectively.
   const pagedItems = filteredItems.slice((itemPage - 1) * pickerPageSize, itemPage * pickerPageSize)
   const pagedBatches = filteredBatches.slice((batchPage - 1) * pickerPageSize, batchPage * pickerPageSize)
   const pagedLocations = filteredLocations.slice(
@@ -139,6 +146,7 @@ export function CurrentStockTable({
         </TabsList>
       </div>
 
+      {/* Current Stock Content */}
       <TabsContent value="current-stock" className="space-y-3">
         <div className="flex items-center">
           <Button variant="outline" size="sm" onClick={() => setShowMainFilters((s) => !s)}>

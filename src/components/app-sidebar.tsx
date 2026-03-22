@@ -143,13 +143,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     let mounted = true
 
     const loadBranches = async () => {
+      if (meLoading) return
+
+      const userid = user.userid?.trim()
+      if (!userid) {
+        if (mounted) setBranchesLoading(false)
+        return
+      }
+
       if (mounted) setBranchesLoading(true)
 
       try {
-        const userid = user.userid?.trim()
-        const endpoint = userid
-          ? `/api/branches?userid=${encodeURIComponent(userid)}`
-          : "/api/branches"
+        const endpoint = `/api/branches?userid=${encodeURIComponent(userid)}`
 
         const res = await fetch(endpoint, { cache: "no-store" })
         if (!res.ok) return
@@ -181,7 +186,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return () => {
       mounted = false
     }
-  }, [user.userid])
+  }, [user.userid, meLoading])
 
   return (
     <Sidebar collapsible="icon" {...props}>
