@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
+import { cookies } from "next/headers"
 import { z } from "zod"
 
 import { callPhp } from "@/src/infrastructure/php-client"
+import { extractSessionUserId, isSessionJwtValid } from "@/src/shared/auth/session"
 
 const receivingMobileLineSchema = z.looseObject({
   seriesname: z.string().optional(),
@@ -188,12 +190,22 @@ export async function POST(req: Request) {
       )
     }
 
+    const cookieStore = await cookies()
+    const token = cookieStore.get("session")?.value
+    const sessionUserId = isSessionJwtValid(token) ? extractSessionUserId(token) : ""
+    const headerWithUser = sessionUserId
+      ? {
+          ...builtDraftPayload.header,
+          createdby: sessionUserId,
+        }
+      : builtDraftPayload.header
+
     const phpPayload = {
       type: "receivingdraftadd",
       company,
       branch,
       receiving: builtDraftPayload.normalizedLines,
-      header: builtDraftPayload.header,
+      header: headerWithUser,
       lines: builtDraftPayload.lines,
     }
 

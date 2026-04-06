@@ -49,3 +49,20 @@ export async function validateReceivingDraft(payload: {
     branch: ctx.branch,
   })
 }
+
+export async function saveReceivingDraft(payload: {
+  type: "receivingdraftadd" | "receivingdraftupdate"
+  company: string
+  branch: string
+  header: Record<string, unknown>
+  lines: Array<Record<string, unknown>>
+}) {
+  const ctx = requireBranchContext(payload.company, payload.branch)
+  if (!ctx.ok) return { ok: false as const, message: ctx.message }
+
+  return postJson<{ ok?: boolean; message?: string; result?: unknown }>(`/api/receiving`, {
+    ...payload,
+    company: ctx.company,
+    branch: ctx.branch,
+  })
+}

@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import dns from "node:dns"
 import { callPhp, extractPhpRows } from "@/src/infrastructure/php-client"
 
 export const runtime = "nodejs"
+
+const preferIpv4 = String(process.env.SMTP_FORCE_IPV4 ?? "").toLowerCase() === "true"
+if (preferIpv4 && typeof dns.setDefaultResultOrder === "function") {
+  dns.setDefaultResultOrder("ipv4first")
+}
 
 const requestSchema = z.object({
   company: z.string().trim().min(1).optional(),
@@ -82,6 +88,23 @@ function summarizeUnknown(value: unknown): string {
   }
 
   return String(value)
+}
+
+async function resolveSmtpHost(
+  host: string
+): Promise<{ host: string; servername?: string }> {
+  if (!preferIpv4 || !host) return { host }
+
+  try {
+    const resolved = await dns.promises.resolve4(host)
+    if (resolved.length > 0) {
+      return { host: resolved[0], servername: host }
+    }
+  } catch {
+    // If IPv4 lookup fails, fall back to the original hostname.
+  }
+
+  return { host }
 }
 
 function buildEmailHtml(company: string, branch: string, rooms: RoomRow[]): string {
@@ -255,11 +278,20 @@ async function sendViaSmtp({
       return { ok: false, detail: "nodemailer createTransport is unavailable." }
     }
 
+    const resolved = await resolveSmtpHost(host)
+
     const transporter = createTransport({
-      host,
+      host: resolved.host,
       port,
       secure,
       auth: { user, pass },
+      ...(resolved.servername
+        ? {
+            tls: {
+              servername: resolved.servername,
+            },
+          }
+        : {}),
     })
 
     const info = await transporter.sendMail({

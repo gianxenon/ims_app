@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
+import { cookies } from "next/headers"
 import { z } from "zod"
 
 import { callPhp, extractPhpRows } from "@/src/infrastructure/php-client"
+import { extractSessionUserId, isSessionJwtValid } from "@/src/shared/auth/session"
 
 type ReceivingMutationType = "receivingdraftadd" | "receivingdraftupdate"
 
@@ -266,13 +268,26 @@ export async function POST(req: Request) {
       )
     }
 
+    const cookieStore = await cookies()
+    const token = cookieStore.get("session")?.value
+    const sessionUserId = isSessionJwtValid(token) ? extractSessionUserId(token) : ""
+    const mutationType = pickMutationType(body.type)
+    const headerWithUser = sessionUserId
+      ? {
+          ...body.header,
+          ...(mutationType === "receivingdraftadd" ? { createdby: sessionUserId } : {}),
+        }
+      : body.header
+
     const phpPayload = {
-      type: pickMutationType(body.type),
+      type: mutationType,
       company,
       branch,
-      header: body.header,
+      header: headerWithUser,
       lines: body.lines,
     }
+
+    console.log("[receiving] payload", JSON.stringify(phpPayload))
 
     const phpResult = await callPhp({ payload: phpPayload })
 

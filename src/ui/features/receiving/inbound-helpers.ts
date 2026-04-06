@@ -54,10 +54,6 @@ function mapIsConfirmedToPutAwayStatus(isConfirmed: unknown): PutAwayStatus {
   return "NOT_PUTAWAY"
 }
 
-// Only Draft documents that are not confirmed can be edited.
-function canEdit(status: DocumentStatus): boolean {
-  return status === "D"
-}
 
 // Sum numeric fields across line items (guards against non-numeric inputs).
 function sumBy(lines: InboundLine[], key: "quantity" | "heads" | "weight"): number {
@@ -73,7 +69,6 @@ export {
   createLine,
   normalizeStatus,
   putAwayStatusLabel,
-  mapIsConfirmedToPutAwayStatus,
-  canEdit,
+  mapIsConfirmedToPutAwayStatus, 
   sumBy,
 }

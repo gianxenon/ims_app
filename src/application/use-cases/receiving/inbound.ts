@@ -17,6 +17,7 @@ import {
   fetchReceivingDocuments,
  // validateLocation as validateLocationRequest,
   validateReceivingDraft as validateReceivingDraftRequest,
+  saveReceivingDraft as saveReceivingDraftRequest,
 } from "@/src/infrastructure/data-sources/receiving/inbound"
 
 import { fetchCustomers, fetchItems, fetchLocations, fetchPalletAddresses, validateLocation as validateLocationRequest, validatePalletAddress  as validatePalletAddressRequest } from "@/src/infrastructure/data-sources/shared/options"
@@ -212,4 +213,21 @@ export async function validateReceivingDraft(
     message: result.data.message ?? "",
     errors: result.data.errors ?? [],
   }
+}
+
+export async function saveReceivingDraft(payload: {
+  type: "receivingdraftadd" | "receivingdraftupdate"
+  company: string
+  branch: string
+  header: Record<string, unknown>
+  lines: Array<Record<string, unknown>>
+}) {
+  const result = await saveReceivingDraftRequest(payload)
+  if (!result.ok) return { ok: false as const, message: result.message }
+
+  if (result.data.ok === false) {
+    return { ok: false as const, message: result.data.message ?? "Failed to save draft." }
+  }
+
+  return { ok: true as const, result: result.data.result }
 }

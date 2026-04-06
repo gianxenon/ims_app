@@ -6,27 +6,14 @@
 // import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card"
 // import { Label } from "@/src/components/ui/label"
 // import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
-// import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/src/components/ui/table"
-import type { InboundState } from "./use-inbound"
-
+// import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/src/components/ui/table" 
 import { DocumentGridTable } from "@/src/ui/features/document-grid/document-grid-table"
 import type { Column } from "@/src/ui/features/document-grid/ui-types"
 import type { InboundDocumentRecord } from "@/src/application/dto/receiving/inbound"
 import { DOCUMENT_STATUS_LABELS, RECEIVING_TYPE_LABELS } from "@/src/shared/transaction-enums"
+import { InboundDocumentTableProps } from "@/src/types/documentTable"
 
-type InboundDocumentTableProps = Pick<
-  InboundState,
-  | "documents"
-  | "pagedDocuments"
-  | "isLoadingDocuments"
-  | "documentPage"
-  | "documentPageSize"
-  | "totalDocumentPages"
-  | "setDocumentPage"
-  | "setDocumentPageSize"
-  | "onOpenDocument"
-  | "onCreateDocument"
-> 
+
 export function InboundDocumentTable({
   documents,
   pagedDocuments,

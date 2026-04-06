@@ -16,15 +16,17 @@ import {
   validateLocation as validateLocationUseCase,
   validatePalletAddress as validatePalletAddressUseCase,
   validateReceivingDraft as validateReceivingDraftUseCase,
+  saveReceivingDraft as saveReceivingDraftUseCase,
 } from "@/src/application/use-cases/receiving/inbound"
 import {
-  canEdit,
+
   createLine,
   initialHeader,
   mapIsConfirmedToPutAwayStatus,
   normalizeStatus,
   sumBy,
 } from "./inbound-helpers"
+import { canEdit } from "@/src/types/documentTable" 
 
 // Lightweight error flags for form validation.
 type HeaderErrorState = Partial<Record<"customerNo" | "customerName" | "palletId" | "location", boolean>>
@@ -48,7 +50,9 @@ export function useInbound() {
 
   // Core document editor state
   const [header, setHeader] = React.useState<InboundHeader>(initialHeader)
+
   const [lines, setLines] = React.useState<InboundLine[]>([])
+  const [currentUserId, setCurrentUserId] = React.useState("")
 
   // Validation and UI flags
   const [headerErrors, setHeaderErrors] = React.useState<HeaderErrorState>({})
@@ -109,7 +113,7 @@ export function useInbound() {
   const totalDocuments = documents.length
   const totalDocumentPages = Math.max(1, Math.ceil(totalDocuments / documentPageSize)) 
   const draftDocumentCount = React.useMemo(() => documents.filter((doc) => doc.status === "D").length, [documents]  )
-  const confirmedDocumentCount = React.useMemo( () => documents.filter((doc) => doc.status === "C").length, [documents] )
+  const confirmedDocumentCount = React.useMemo( () => documents.filter((doc) => doc.status === "O").length, [documents] )
   const cancelledDocumentCount = React.useMemo( () => documents.filter((doc) => doc.status === "CN").length, [documents] )
   
   
@@ -405,6 +409,28 @@ export function useInbound() {
 
     return () => {
       isMounted = false
+    }
+  }, [])
+
+  React.useEffect(() => {
+    let mounted = true
+
+    const loadMe = async () => {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" })
+        if (!res.ok) return
+        const payload = (await res.json()) as { user?: { userid?: string } }
+        const userid = String(payload.user?.userid ?? "").trim()
+        if (mounted && userid) setCurrentUserId(userid)
+      } catch {
+        // ignore
+      }
+    }
+
+    void loadMe()
+
+    return () => {
+      mounted = false
     }
   }, [])
 
@@ -923,8 +949,10 @@ export function useInbound() {
     try {
       const seriesName = header.receivingType === "CS_RETURN" ? "CS Return" : "CS Receive"
       const draftDocStatus = "D"
+      const draftType: "receivingdraftupdate" | "receivingdraftadd" =
+        hasSavedDraft ? "receivingdraftupdate" : "receivingdraftadd"
       const fullDraftPayload = {
-        type: hasSavedDraft ? "receivingdraftupdate" : "receivingdraftadd",
+        type: draftType,
         company,
         branch,
         header: {
@@ -941,6 +969,7 @@ export function useInbound() {
           totalQty,
           totalHeads,
           totalWeight,
+          createdby: currentUserId,
         },
         lines: lines.map((line, index) => ({
           lineNo: index + 1,
@@ -1014,6 +1043,13 @@ export function useInbound() {
           setLineErrors(nextServerLineErrors)
         }
         showDraftValidationErrors(serverErrors.length > 0 ? serverErrors : ["Draft validation failed."])
+        setIsSavingDraft(false)
+        return
+      }
+
+      const saveResult = await saveReceivingDraftUseCase(fullDraftPayload)
+      if (!saveResult.ok) {
+        showDraftValidationErrors([saveResult.message ?? "Failed to save draft. Please try again."])
         setIsSavingDraft(false)
         return
       }

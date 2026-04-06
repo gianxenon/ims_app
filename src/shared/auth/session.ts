@@ -2,6 +2,11 @@ type JwtPayload = {
   exp?: number | string
 }
 
+type JwtUserPayload = {
+  user?: Record<string, unknown>
+  userid?: unknown
+}
+
 function decodeBase64Url(input: string): string {
   const normalized = input.replace(/-/g, "+").replace(/_/g, "/")
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")
@@ -32,5 +37,31 @@ export function isSessionJwtValid(token?: string): boolean {
     return Date.now() < expValue * 1000
   } catch {
     return false
+  }
+}
+
+export function extractSessionUserId(token?: string): string {
+  if (!token) return ""
+
+  const parts = token.split(".")
+  if (parts.length !== 3) return ""
+
+  try {
+    const payloadJson = decodeBase64Url(parts[1])
+    const payload = JSON.parse(payloadJson) as JwtUserPayload
+    const user = payload.user && typeof payload.user === "object" ? payload.user : {}
+
+    const userid =
+      typeof user.id === "string"
+        ? user.id
+        : typeof user.userid === "string"
+        ? user.userid
+        : typeof payload.userid === "string"
+        ? payload.userid
+        : ""
+
+    return String(userid).trim()
+  } catch {
+    return ""
   }
 }
